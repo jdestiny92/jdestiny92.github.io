@@ -657,7 +657,7 @@
                       <span class="testimonial17-text17 thq-body-small">
                         <fragment class="home-fragment38">
                           <span class="home-text38">
-                            After dealing with unreliable contractors in the past, we were hesitant to start another project, but Morriello Home Solutions completely changed our perspective. 
+                            After dealing with unreliable contractors in the past, we were hesitant to start another project, but Moriello Home Solutions completely changed our perspective. 
                             They helped us with a full basement remodel, and the experience was seamless from start to finish. 
                             The crew was professional, friendly, and respectful of our home. The finished space is exactly what we envisioned: modern, functional, and beautifully done. 
                             We will definitely be using them for future projects!
@@ -695,7 +695,7 @@
                       <span class="testimonial17-text20 thq-body-small">
                         <fragment class="home-fragment39">
                           <span class="home-text39">
-                            Morriello Home Solutions built a custom deck for our backyard, and we couldn't be happier with the results. 
+                            Moriello Home Solutions built a custom deck for our backyard, and we couldn't be happier with the results. 
                             From the initial consultation to the final build, the team was amazing to work with. 
                             They provided great design ideas and worked within our budget. 
                             The craftsmanship is top-notch, and the project was completed on time. 
@@ -734,12 +734,12 @@
                       <span class="testimonial17-text23 thq-body-small">
                         <fragment class="home-fragment40">
                           <span class="home-text40">
-                            I cannot recommend Morriello Home Solutions enough! 
+                            I cannot recommend Moriello Home Solutions enough! 
                             We hired them for a complete kitchen and bathroom renovation, and the results were beyond our expectations. 
                             The team was professional, punctual, and truly paid attention to every detail. 
                             They kept us updated throughout the process and made sure we were 100% satisfied with the outcome. 
                             Our home now feels brand new, and we've received so many compliments from friends and family. 
-                            Thank you, Morriello Home Solutions, for making our dream home a reality!
+                            Thank you, Moriello Home Solutions, for making our dream home a reality!
                           </span>
                         </fragment>
                       </span>
@@ -836,43 +836,27 @@
     
     <script>
       $(document).ready(function () {
-          const API_KEY = "a7502d835214bcaaf4deb393244d7659";
-          const API_SECRET = "1f8699e29d6e0602627799e4d67c6097";
-          const mailjetUrl = "https://api.mailjet.com/v3.1/send";
+          const mailjetUrl = "https://moriello-api.onrender.com/email";
 
           $('#send').click(function(){
             var input_name = $('#name').val();
             var input_email = $('#email').val();
             var input_message = $('#message').val();
             
-            const emailData = {
-              Messages: [
-                  {
-                      From: {
-                          Email: "jbiebelberg@gmail.com",
-                          Name: "Your Website"
-                      },
-                      To: [
-                          {
-                              Email: "jbiebelberg@gmail.com",
-                              Name: "Stephano Moriello"
-                          }
-                      ],
-                      Subject: "New Inquiry!",
-                      TextPart: "This is an email notification sent from your website:",
-                      HTMLPart: "<p>Inquiry from: " + input_name + " <br> " + "Their email address: " + input_email + " <br> " + "Their message: " + input_message + " </p>"
-                  }
-                      ]
-                  };
+            const payLoad = {
+              "Name": input_name,
+              "Email": input_email,
+              "Message": input_message  
+            };
 
             $.ajax({
               url: mailjetUrl,
               type: "POST",
               data: JSON.stringify(emailData),
               contentType: "application/json",
-              headers: {
-                  Authorization: "Basic " + btoa(API_KEY + ":" + API_SECRET)
-              },
+              // headers: {
+              //     Authorization: "Basic " + btoa(API_KEY + ":" + API_SECRET)
+              // },
               success: function (response) {
                   console.log("Email sent successfully:", response);
               },
