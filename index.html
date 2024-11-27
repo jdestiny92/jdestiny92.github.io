@@ -859,9 +859,11 @@
               // },
               success: function (response) {
                   console.log("Email sent successfully:", response);
+                  alert("Email sent successfully:", response);
               },
               error: function (xhr, status, error) {
                   console.error("Error sending email:", xhr.responseJSON);
+                  alert("Error sending email:", xhr.responseJSON);
               }
             });      
 
@@ -870,7 +872,7 @@
             $('#email').val("");
             $('#message').val("");
 
-            alert('Email sent!');
+            // alert('Email sent!');
 
           // end onclick
           });
