@@ -829,10 +829,6 @@
         </footer4-wrapper>
       </div>
     </div>
-    <!-- <script
-      defer=""
-      src="https://unpkg.com/@teleporthq/teleport-custom-scripts"
-    ></script> -->
     
     <script>
       $(document).ready(function () {
@@ -854,16 +850,14 @@
               type: "POST",
               data: JSON.stringify(payLoad),
               contentType: "application/json",
-              // headers: {
-              //     Authorization: "Basic " + btoa(API_KEY + ":" + API_SECRET)
-              // },
               success: function (response) {
                   console.log("Email sent successfully:", response);
-                  alert("Email sent successfully:", response);
               },
-              error: function (xhr, status, error) {
-                  console.error("Error sending email:", xhr.responseJSON);
-                  alert("Error sending email:", xhr.responseJSON);
+              error: function (xhr2, status, error) {
+                  // console.error("Error sending email:", xhr.responseJSON);
+                  console.log(xhr2);
+                  console.log(status);
+                  console.log(error);
               }
             });      
 
@@ -872,7 +866,7 @@
             $('#email').val("");
             $('#message').val("");
 
-            // alert('Email sent!');
+            //alert('Email sent!');
 
           // end onclick
           });
