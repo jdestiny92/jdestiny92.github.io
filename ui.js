@@ -1,11 +1,11 @@
 /* ==========================================================================
-   UI.JS — Mobile Touch Controller & Cinematic Battle Player
+   UI.JS — Mobile Touch Controller, Pure Card Art & Cinematic Battle Player
    ========================================================================== */
 const UI = {
   selectedUnitLoc: null, 
   playbackSpeed: 1,
   isAnimatingCombat: false,
-  benchMinimized: true, // Bench minimized by default in Market Phase
+  benchMinimized: true,
 
   init() { this.populateReferenceModal(); },
 
@@ -15,16 +15,21 @@ const UI = {
     if (elName === 'Shadow') elName = 'Dark'; 
     return `assets/${clsName}/${elName}/${clsName}_${star}_star_${elName.toLowerCase()}.png`;
   },
+
   handleImageError(imgEl, cls, star) {
-    imgEl.onerror = null; imgEl.src = `assets/${cls.toLowerCase()}_${star}.svg`;
+    imgEl.onerror = null;
+    imgEl.src = `assets/${cls.toLowerCase()}_${star}.svg`;
   },
 
   startGame(difficulty) {
-    this.selectedUnitLoc = null; this.isAnimatingCombat = false; this.benchMinimized = true;
+    this.selectedUnitLoc = null;
+    this.isAnimatingCombat = false;
+    this.benchMinimized = true;
     BotAI.initBotPersonality(difficulty);
     Engine.createNewGame(difficulty);
     document.getElementById('main-menu').classList.remove('active');
     document.getElementById('gameover-modal').classList.remove('active');
+    document.getElementById('round-end-modal').classList.remove('active');
     document.getElementById('bot-label').textContent = difficulty === 'easy' ? 'EASY BOT' : 'MED BOT';
     this.setStatusBanner(`Round 1: Buy units from the Market`);
     this.renderAll();
@@ -33,6 +38,7 @@ const UI = {
   returnToMenu() {
     this.isAnimatingCombat = false;
     document.getElementById('gameover-modal').classList.remove('active');
+    document.getElementById('round-end-modal').classList.remove('active');
     document.getElementById('settings-modal').classList.remove('active');
     document.getElementById('main-menu').classList.add('active');
   },
@@ -45,10 +51,10 @@ const UI = {
   },
 
   undoAction() {
-    if (Engine.state.phase === 'COMBAT' || Engine.state.phase === 'GAMEOVER') return;
+    if (Engine.state.phase === 'COMBAT' || Engine.state.phase === 'END' || Engine.state.phase === 'GAMEOVER') return;
     if (Engine.undo()) {
       this.selectedUnitLoc = null;
-      this.setStatusBanner('Action undone.');
+      this.setStatusBanner('↩️ Undid last action.');
       this.renderAll();
     } else {
       this.setStatusBanner('Nothing to undo.');
@@ -71,13 +77,23 @@ const UI = {
 
   advancePhase() {
     if (Engine.state.phase === 'MARKET') {
+      Engine.saveSnapshot();
       Engine.state.phase = 'PREPARATION';
       this.benchMinimized = false; // Expand bench for placement
       this.selectedUnitLoc = null;
-      this.setStatusBanner(`Preparation: Place units on your Board`);
+      this.setStatusBanner(`Preparation: Place units from your Bench onto your Board`);
     } else if (Engine.state.phase === 'PREPARATION') {
       this.startCombatPhase();
     }
+    this.renderAll();
+  },
+
+  proceedToNextRound() {
+    this.toggleModal('round-end-modal', false);
+    Engine.advanceToNextMarketRound();
+    this.benchMinimized = true;
+    this.selectedUnitLoc = null;
+    this.setStatusBanner(`Round ${Engine.state.round}: Buy units from the Market`);
     this.renderAll();
   },
 
@@ -85,7 +101,6 @@ const UI = {
     const state = Engine.state;
     if (!state) return;
 
-    // Apply Phase CSS to Body
     document.body.className = `phase-${state.phase.toLowerCase()}`;
     const btnNext = document.getElementById('btn-next-phase');
     if (state.phase === 'MARKET') {
@@ -98,7 +113,6 @@ const UI = {
       btnNext.style.display = 'none';
     }
 
-    // Bench Toggle Display
     const benchContainer = document.getElementById('bench-container');
     const toggleText = document.getElementById('bench-toggle-text');
     if (this.benchMinimized) {
@@ -114,15 +128,28 @@ const UI = {
     this.renderLossDots('player-losses', state.player.losses);
     this.renderLossDots('bot-losses', state.bot.losses);
 
-    document.getElementById('player-board-title').textContent = `🛡️ Your Board (${Engine.getBoardCount(state.player)}/${state.player.unlockedSlots})`;
-    document.getElementById('opp-board-title').textContent = `🤖 Bot Board (${Engine.getBoardCount(state.bot)}/${state.bot.unlockedSlots})`;
+    document.getElementById('player-board-title').textContent = `🛡️ Your Board (${Engine.getBoardCount(state.player)}/${state.player.unlockedSlots} Slots)`;
+    document.getElementById('opp-board-title').textContent = `🤖 Bot Board (${Engine.getBoardCount(state.bot)}/${state.bot.unlockedSlots} Slots)`;
     document.getElementById('opp-gold-display').textContent = `🪙 ${state.bot.gold}`;
     document.getElementById('player-gold').textContent = state.player.gold;
     document.getElementById('bench-count').textContent = state.player.bench.length;
+    document.getElementById('deck-counter').textContent = `Deck: ${state.deck.length}`;
 
+    // Undo button state
+    const btnUndo = document.getElementById('btn-undo');
+    if (btnUndo) btnUndo.disabled = Engine.history.length === 0;
+
+    // +1 Slot button with explicit Gold cost
     const btnSlot = document.getElementById('btn-buy-slot');
-    if (state.player.unlockedSlots >= 6) { btnSlot.disabled = true; btnSlot.innerHTML = `🔓 Max Slots`; } 
-    else { btnSlot.disabled = state.player.gold < SLOT_UNLOCK_COSTS[state.player.unlockedSlots - 1]; }
+    if (state.player.unlockedSlots >= 6) {
+      btnSlot.disabled = true;
+      btnSlot.textContent = `🔓 Max Slots (6/6)`;
+    } else {
+      const nextCost = SLOT_UNLOCK_COSTS[state.player.unlockedSlots - 1];
+      btnSlot.disabled = state.player.gold < nextCost;
+      btnSlot.textContent = `🔓 +1 Slot (${nextCost}G)`;
+    }
+
     document.getElementById('btn-reroll').disabled = state.player.gold < 2;
 
     this.renderSynergyBar('player-synergies', state.player);
@@ -188,40 +215,49 @@ const UI = {
   },
 
   renderMarket() {
-    const marketEl = document.getElementById('market-cards'); marketEl.innerHTML = '';
+    const marketEl = document.getElementById('market-cards');
+    marketEl.innerHTML = '';
     Engine.state.market.forEach((unit, idx) => {
-      const wrap = document.createElement('div'); wrap.className = 'market-slot';
+      const itemWrap = document.createElement('div');
+      itemWrap.className = 'market-item-wrap';
+
+      const slot = document.createElement('div');
+      slot.className = 'market-slot';
+
       if (unit) {
         const card = this.createUnitCardDOM(unit, { ap: unit.baseAp, hp: unit.baseHp, isMarket: true });
-        card.onclick = () => this.onBuyMarketCard(idx); wrap.appendChild(card);
+        card.onclick = () => this.onBuyMarketCard(idx);
+        slot.appendChild(card);
+
+        const priceTag = document.createElement('div');
+        priceTag.className = 'market-price-below';
+        priceTag.textContent = '🪙 3G';
+        priceTag.onclick = () => this.onBuyMarketCard(idx);
+
+        itemWrap.appendChild(slot);
+        itemWrap.appendChild(priceTag);
+      } else {
+        itemWrap.appendChild(slot);
       }
-      marketEl.appendChild(wrap);
+      marketEl.appendChild(itemWrap);
     });
   },
 
+  // Pure character card with zero text/element overlays inside the card
   createUnitCardDOM(unit, opts = {}) {
     const card = document.createElement('div');
-    card.className = `unit-card el-${unit.element} ${opts.isSelected ? 'selected' : ''} ${opts.canFuse ? 'can-fuse' : ''} ${opts.dead ? 'dead-unit' : ''}`;
+    card.className = `unit-card el-${unit.element} ${opts.isSelected ? 'selected' : ''} ${opts.canFuse ? 'can-fuse' : ''} ${opts.dead ? 'dead-unit' : ''} ${opts.stunned ? 'stunned-unit' : ''}`;
     const imgPath = this.getUnitImagePath(unit.cls, unit.star, unit.element);
 
-    let innerHTML = `<div class="unit-art-wrap"><img src="${imgPath}" onerror="UI.handleImageError(this, '${unit.cls}', ${unit.star}, '${unit.element}')" /></div>`;
+    let innerHTML = `<div class="unit-art-wrap"><img src="${imgPath}" alt="${unit.cls}" onerror="UI.handleImageError(this, '${unit.cls}', ${unit.star})" /></div>`;
     
     if (opts.penaltyText) {
       innerHTML += `<div class="unit-role-warning" title="${opts.penaltyText}">⚠️</div>`;
     }
 
-    if (opts.isMarket) {
-      innerHTML += `
-        <div class="clean-card-bottom">
-          <span>${ELEMENT_ICONS[unit.element]} ${unit.element}</span>
-          <span class="gold-text" style="color: #fbbf24;">🪙 3G</span>
-        </div>`;
-    } else {
-      innerHTML += `
-        <div class="clean-card-bottom" style="bottom: 4px;">
-          <span>${ELEMENT_ICONS[unit.element]} ${unit.element}</span>
-        </div>
-        <div class="hp-bar-track"><div class="hp-bar-fill" style="width:${opts.maxHp ? Math.max(0, Math.min(100, Math.round((opts.hp/opts.maxHp)*100))) : 100}%"></div></div>`;
+    if (!opts.isMarket) {
+      const hpPct = opts.maxHp ? Math.max(0, Math.min(100, Math.round((opts.hp / opts.maxHp) * 100))) : 100;
+      innerHTML += `<div class="hp-bar-track"><div class="hp-bar-fill" style="width:${hpPct}%"></div></div>`;
     }
     
     card.innerHTML = innerHTML;
@@ -243,7 +279,7 @@ const UI = {
 
     const unit = this.getSelectedUnitObj();
     if (!unit) { this.selectedUnitLoc = null; btnToBench.classList.add('hidden'); btnSell.classList.add('hidden'); return; }
-    infoEl.textContent = `${unit.cls} (${unit.star}★ ${unit.element})`;
+    infoEl.textContent = `${unit.cls} (${unit.star}★ ${unit.element}) • ${unit.role}`;
     btnSell.classList.remove('hidden'); btnSell.textContent = `💰 Sell (+${SELL_REFUND[unit.star] || 1}G)`;
     if (this.selectedUnitLoc.zone === 'board') btnToBench.classList.remove('hidden'); else btnToBench.classList.add('hidden');
   },
@@ -257,35 +293,55 @@ const UI = {
     if (Engine.state.phase !== 'MARKET') return;
     Engine.saveSnapshot();
     const res = Engine.buyUnit(Engine.state.player, idx);
-    if (!res.ok) { Engine.history.pop(); return; }
-    
-    // Automatically reveal bench if a unit is bought while minimized
+    if (!res.ok) {
+      Engine.history.pop();
+      this.setStatusBanner(`⚠️ ${res.msg || 'Cannot buy unit'}`);
+      return;
+    }
     this.benchMinimized = false;
     this.selectedUnitLoc = { zone: 'bench', index: Engine.state.player.bench.length - 1 };
+    this.setStatusBanner(`Bought ${res.unit.star}★ ${res.unit.element} ${res.unit.cls}!`);
     this.renderAll();
   },
+
   buySlot() {
-    if (Engine.state.phase !== 'MARKET') return;
+    if (!['MARKET','PREPARATION'].includes(Engine.state.phase)) return;
     Engine.saveSnapshot();
-    if (!Engine.buySlot(Engine.state.player).ok) Engine.history.pop();
+    const res = Engine.buySlot(Engine.state.player);
+    if (!res.ok) {
+      Engine.history.pop();
+      this.setStatusBanner(`⚠️ ${res.msg || 'Cannot unlock slot'}`);
+      return;
+    }
+    this.setStatusBanner(`🔓 Unlocked Board Slot ${res.unlockedSlots}/6 (-${res.cost}G)!`);
     this.renderAll();
   },
+
   rerollMarket() {
     if (Engine.state.phase !== 'MARKET') return;
     Engine.saveSnapshot();
-    if (!Engine.rerollMarket(Engine.state.player).ok) Engine.history.pop();
+    const res = Engine.rerollMarket(Engine.state.player);
+    if (!res.ok) {
+      Engine.history.pop();
+      this.setStatusBanner(`⚠️ ${res.msg || 'Need 2 Gold to reroll'}`);
+      return;
+    }
+    this.setStatusBanner(`🎲 Rerolled Market (-2G)!`);
     this.renderAll();
   },
+
   onBenchSlotClick(index) {
     if (!['MARKET','PREPARATION'].includes(Engine.state.phase)) return;
     if (this.selectedUnitLoc?.zone === 'bench' && this.selectedUnitLoc.index === index) this.selectedUnitLoc = null;
     else this.selectedUnitLoc = { zone: 'bench', index };
     this.renderAll();
   },
+
   onEmptyBenchSlotClick() {
     if (!['MARKET','PREPARATION'].includes(Engine.state.phase)) return;
     if (this.selectedUnitLoc?.zone === 'board') this.moveSelectedToBench();
   },
+
   onBoardSlotClick(row, col) {
     if (!['MARKET','PREPARATION'].includes(Engine.state.phase)) return;
     const pState = Engine.state.player, targetUnit = pState.board[row][col];
@@ -295,15 +351,21 @@ const UI = {
     Engine.saveSnapshot();
     if (this.selectedUnitLoc.zone === 'bench') {
       const benchUnit = pState.bench[this.selectedUnitLoc.index];
-      if (!targetUnit && Engine.getBoardCount(pState) >= pState.unlockedSlots) { Engine.history.pop(); this.setStatusBanner(`⚠️ Board limit reached.`); return; }
+      if (!targetUnit && Engine.getBoardCount(pState) >= pState.unlockedSlots) {
+        Engine.history.pop();
+        this.setStatusBanner(`⚠️ Board limit reached (${pState.unlockedSlots}/${pState.unlockedSlots}). Unlock a slot first!`);
+        return;
+      }
       pState.board[row][col] = benchUnit;
       if (!targetUnit) pState.bench.splice(this.selectedUnitLoc.index, 1); else pState.bench[this.selectedUnitLoc.index] = targetUnit;
     } else if (this.selectedUnitLoc.zone === 'board') {
       pState.board[row][col] = pState.board[this.selectedUnitLoc.row][this.selectedUnitLoc.col];
       pState.board[this.selectedUnitLoc.row][this.selectedUnitLoc.col] = targetUnit || null;
     }
-    this.selectedUnitLoc = null; this.renderAll();
+    this.selectedUnitLoc = null;
+    this.renderAll();
   },
+
   moveSelectedToBench() {
     if (!this.selectedUnitLoc || this.selectedUnitLoc.zone !== 'board') return;
     const pState = Engine.state.player;
@@ -311,14 +373,19 @@ const UI = {
     Engine.saveSnapshot();
     pState.bench.push(pState.board[this.selectedUnitLoc.row][this.selectedUnitLoc.col]);
     pState.board[this.selectedUnitLoc.row][this.selectedUnitLoc.col] = null;
-    this.selectedUnitLoc = null; this.renderAll();
+    this.selectedUnitLoc = null;
+    this.renderAll();
   },
+
   sellSelectedUnit() {
     if (!this.selectedUnitLoc || !['MARKET','PREPARATION'].includes(Engine.state.phase)) return;
     Engine.saveSnapshot();
-    Engine.sellUnit(Engine.state.player, this.selectedUnitLoc);
-    this.selectedUnitLoc = null; this.renderAll();
+    const res = Engine.sellUnit(Engine.state.player, this.selectedUnitLoc);
+    if (res.ok) this.setStatusBanner(`💰 Sold ${res.unit.cls} for +${res.refund}G`);
+    this.selectedUnitLoc = null;
+    this.renderAll();
   },
+
   triggerFusionPrompt() {
     const cands = Engine.getFusionCandidates(Engine.state.player);
     if (!cands.length) return;
@@ -331,46 +398,117 @@ const UI = {
     document.getElementById('fusion-element-choices').innerHTML = unique.map(el => `<button class="btn btn-primary el-${el}" onclick="UI.doFusion('${cands[0].cls}', ${cands[0].star}, '${el}')">${ELEMENT_ICONS[el]} ${el}</button>`).join('');
     this.toggleModal('fusion-modal', true);
   },
+
   doFusion(cls, star, element) {
     this.toggleModal('fusion-modal', false);
     Engine.saveSnapshot();
     Engine.executeFusion(Engine.state.player, cls, star, element);
-    this.selectedUnitLoc = null; this.renderAll();
+    this.selectedUnitLoc = null;
+    this.renderAll();
   },
 
+  // ==========================================================================
+  // FULL CINEMATIC COMBAT PHASE PLAYBACK + END PHASE STEP
+  // ==========================================================================
   async startCombatPhase() {
     if (Engine.state.phase !== 'PREPARATION' || this.isAnimatingCombat) return;
     const pState = Engine.state.player;
-    if (Engine.getBoardCount(pState) === 0 && pState.bench.length > 0) pState.board[pState.bench[0].role==='Ranged'?'back':'front'][0] = pState.bench.shift();
+    if (Engine.getBoardCount(pState) === 0 && pState.bench.length > 0) {
+      const u = pState.bench.shift();
+      pState.board[u.role === 'Ranged' ? 'back' : 'front'][0] = u;
+    }
     
-    // Lock in for battle
     BotAI.executeTurn();
-    this.selectedUnitLoc = null; Engine.state.phase = 'COMBAT'; this.isAnimatingCombat = true;
+    this.selectedUnitLoc = null;
+    Engine.state.phase = 'COMBAT';
+    this.isAnimatingCombat = true;
     this.renderAll();
 
     const battleResult = Engine.simulateBattle();
     for (const entry of battleResult.log) {
       if (!this.isAnimatingCombat) return;
-      if (entry.type === 'START') { this.setStatusBanner(entry.text); this.renderCombatSnapshot(entry.snapshot); await this.sleep(600); }
-      else if (entry.type === 'WAVE') {
+
+      if (entry.type === 'START') {
+        this.setStatusBanner(entry.text);
+        this.renderCombatSnapshot(entry.snapshot);
+        await this.sleep(650);
+      } else if (entry.type === 'WAVE') {
         this.setStatusBanner(entry.waveLabel);
         entry.events.forEach(ev => {
-          this.animateUnitAction(ev.atkSide, ev.atkRow, ev.atkCol, ev.atkSide==='player'?'anim-attack-up':'anim-attack-down');
+          this.animateUnitAction(ev.atkSide, ev.atkRow, ev.atkCol, ev.atkSide === 'player' ? 'anim-attack-up' : 'anim-attack-down');
           this.animateUnitAction(ev.targetSide, ev.targetRow, ev.targetCol, 'anim-hit');
+          if (ev.dodged) {
+            this.spawnFloatingText(ev.targetSide, ev.targetRow, ev.targetCol, 'DODGE!', 'float-special');
+          } else {
+            this.spawnFloatingText(ev.targetSide, ev.targetRow, ev.targetCol, `-${ev.dmg}${ev.isCrit ? '⚡' : ''}`, 'float-dmg');
+          }
+          ev.splashTargets?.forEach(sp => {
+            this.spawnFloatingText(sp.side, sp.row, sp.col, `-1 💥`, 'float-dmg');
+          });
         });
-        await this.sleep(450); this.renderCombatSnapshot(entry.snapshot); await this.sleep(450);
-      }
-      else if (entry.type === 'REVIVE' || entry.type === 'DEATH') { this.renderCombatSnapshot(entry.snapshot); await this.sleep(300); }
-      else if (entry.type === 'END') {
-        this.setStatusBanner(entry.outcome === 'PLAYER_WIN' ? `🏆 VICTORY!` : entry.outcome === 'BOT_WIN' ? `💀 DEFEAT!` : `🤝 TIE!`);
-        await this.sleep(1400);
+        await this.sleep(480);
+        this.renderCombatSnapshot(entry.snapshot);
+        await this.sleep(480);
+      } else if (entry.type === 'HEAL') {
+        entry.events.forEach(ev => {
+          this.spawnFloatingText(ev.side, ev.row, ev.col, `+${ev.amount} ❤️`, 'float-heal');
+        });
+        this.renderCombatSnapshot(entry.snapshot);
+        await this.sleep(500);
+      } else if (entry.type === 'REVIVE') {
+        this.spawnFloatingText(entry.side, entry.row, entry.col, `REVIVED! ✨`, 'float-special');
+        this.renderCombatSnapshot(entry.snapshot);
+        await this.sleep(550);
+      } else if (entry.type === 'DEATH') {
+        this.renderCombatSnapshot(entry.snapshot);
+        await this.sleep(300);
+      } else if (entry.type === 'END') {
+        const msg = entry.outcome === 'PLAYER_WIN' ? `🏆 VICTORY!` : entry.outcome === 'BOT_WIN' ? `💀 DEFEAT!` : `🤝 TIE!`;
+        this.setStatusBanner(msg);
+        await this.sleep(1100);
       }
     }
 
-    Engine.resolveRoundOutcome(battleResult.outcome);
+    const summary = Engine.applyBattleOutcome(battleResult.outcome, battleResult.pRemaining, battleResult.bRemaining);
     this.isAnimatingCombat = false;
-    if (Engine.state.phase === 'GAMEOVER') this.showGameOverModal();
-    else { this.benchMinimized = true; this.renderAll(); } // Auto-minimize bench for new Market Round
+    this.renderAll();
+
+    if (Engine.state.phase === 'GAMEOVER') {
+      this.showGameOverModal();
+    } else {
+      this.showRoundEndModal(summary);
+    }
+  },
+
+  showRoundEndModal(summary) {
+    document.getElementById('end-round-badge').textContent = `END OF ROUND ${Engine.state.round}`;
+    const titleEl = document.getElementById('end-outcome-title');
+    const subEl = document.getElementById('end-outcome-subtitle');
+    const detailsEl = document.getElementById('end-summary-details');
+
+    if (summary.outcome === 'PLAYER_WIN') {
+      titleEl.textContent = '🏆 ROUND VICTORY!';
+      subEl.textContent = 'You wiped out the enemy board!';
+    } else if (summary.outcome === 'BOT_WIN') {
+      titleEl.textContent = '💀 ROUND DEFEAT';
+      subEl.textContent = 'Your board was wiped out.';
+    } else {
+      titleEl.textContent = '🤝 MUTUAL TIE';
+      subEl.textContent = 'Both sides were destroyed simultaneously!';
+    }
+
+    const lossText = summary.outcome === 'PLAYER_WIN'
+      ? 'Bot takes +1 Loss Token'
+      : (summary.outcome === 'BOT_WIN' ? 'You take +1 Loss Token' : 'No Loss Tokens dealt');
+
+    detailsEl.innerHTML = `
+      <div class="end-summary-row"><span>Surviving Units:</span><strong>You: ${summary.pRemaining} | Bot: ${summary.bRemaining}</strong></div>
+      <div class="end-summary-row"><span>Loss Penalty:</span><strong>${lossText}</strong></div>
+      <div class="end-summary-row"><span>Your Gold Income:</span><strong style="color:#fbbf24;">+${summary.playerGoldEarned}G (Total: ${Engine.state.player.gold}G)</strong></div>
+      <div class="end-summary-row"><span>Current Lives:</span><strong>You: ${6 - Engine.state.player.losses}/6 | Bot: ${6 - Engine.state.bot.losses}/6</strong></div>
+    `;
+
+    this.toggleModal('round-end-modal', true);
   },
 
   renderCombatSnapshot(snapshot) {
@@ -381,24 +519,62 @@ const UI = {
           const slot = document.querySelector(`#${side==='player'?'player':'opp'}-${row}-row .board-slot[data-col="${col}"]`);
           if (!slot) continue; slot.innerHTML = '';
           const u = units.find(i => i.row===row && i.col===col);
-          if (u) slot.appendChild(this.createUnitCardDOM(u, { ap:u.ap, hp:u.hp, maxHp:u.maxHp, dead:!u.alive }));
+          if (u) slot.appendChild(this.createUnitCardDOM(u, { ap:u.ap, hp:u.hp, maxHp:u.maxHp, dead:!u.alive, stunned:u.stunned }));
         }
       });
     };
     renderSide(snapshot.player, 'player'); renderSide(snapshot.bot, 'bot');
   },
+
+  getSlotElement(side, row, col) {
+    return document.querySelector(`#${side==='player'?'player':'opp'}-${row}-row .board-slot[data-col="${col}"]`);
+  },
+
   animateUnitAction(side, row, col, animClass) {
-    const card = document.querySelector(`#${side==='player'?'player':'opp'}-${row}-row .board-slot[data-col="${col}"] .unit-card`);
+    const slotEl = this.getSlotElement(side, row, col);
+    if (!slotEl) return;
+    const card = slotEl.querySelector('.unit-card');
     if (card) { card.classList.remove(animClass); void card.offsetWidth; card.classList.add(animClass); }
   },
+
+  spawnFloatingText(side, row, col, text, clsName) {
+    const slotEl = this.getSlotElement(side, row, col);
+    if (!slotEl) return;
+    const pop = document.createElement('div');
+    pop.className = `floating-text ${clsName}`;
+    pop.textContent = text;
+    slotEl.appendChild(pop);
+    setTimeout(() => pop.remove(), 800);
+  },
+
   sleep(ms) { return new Promise(r => setTimeout(r, ms / this.playbackSpeed)); },
+
   showGameOverModal() {
     const pLosses = Engine.state.player.losses, bLosses = Engine.state.bot.losses;
-    document.getElementById('gameover-title').textContent = (bLosses >= 6 && pLosses < 6) ? '🏆 VICTORY!' : '💀 DEFEAT';
-    document.getElementById('gameover-subtitle').textContent = `Round ${Engine.state.round}.`;
+    document.getElementById('gameover-title').textContent = (bLosses >= 6 && pLosses < 6) ? '🏆 MATCH VICTORY!' : '💀 MATCH DEFEAT';
+    document.getElementById('gameover-subtitle').textContent = `Match ended in Round ${Engine.state.round}.`;
     this.toggleModal('gameover-modal', true);
   },
-  populateReferenceModal() { /* Handled previously */ }
+
+  populateReferenceModal() {
+    const cGrid = document.getElementById('ref-class-synergies');
+    const eGrid = document.getElementById('ref-element-synergies');
+    if (!cGrid || !eGrid) return;
+
+    cGrid.innerHTML = Object.entries(CLASS_SYNERGY_DESC).map(([cls, tiers]) => `
+      <div class="ref-item">
+        <strong>${UNIT_STATS[cls].icon} ${cls} (${UNIT_STATS[cls].role}):</strong>
+        (2) ${tiers[2]} • (3) ${tiers[3]}
+      </div>
+    `).join('');
+
+    eGrid.innerHTML = Object.entries(ELEMENT_SYNERGY_DESC).map(([el, tiers]) => `
+      <div class="ref-item">
+        <strong>${ELEMENT_ICONS[el]} ${el}:</strong>
+        (2) ${tiers[2]} • (4) ${tiers[4]} • (6) ${tiers[6]}
+      </div>
+    `).join('');
+  }
 };
 
 window.addEventListener('DOMContentLoaded', () => UI.init());

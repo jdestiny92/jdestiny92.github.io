@@ -65,6 +65,19 @@
     </div>
   </div>
 
+  <!-- ROUND END PHASE SUMMARY MODAL -->
+  <div id="round-end-modal" class="modal-overlay">
+    <div class="menu-card">
+      <div class="menu-badge" id="end-round-badge">END OF ROUND 1</div>
+      <h1 id="end-outcome-title">🏆 VICTORY!</h1>
+      <p id="end-outcome-subtitle" class="subtitle" style="margin-bottom: 12px;"></p>
+      <div id="end-summary-details" class="end-summary-box"></div>
+      <button class="btn btn-battle" style="width: 100%; font-size: 14px; padding: 12px;" onclick="UI.proceedToNextRound()">
+        ➡️ Next Market Phase
+      </button>
+    </div>
+  </div>
+
   <!-- GAME OVER MODAL -->
   <div id="gameover-modal" class="modal-overlay">
     <div class="menu-card">
@@ -107,7 +120,6 @@
         </div>
       </div>
       <div class="hud-right">
-        <button class="icon-btn" onclick="UI.undoAction()" title="Undo Last Action">↩️</button>
         <button class="icon-btn" onclick="UI.toggleModal('rules-modal', true)" title="Synergy Sheet">📘</button>
         <button class="icon-btn" onclick="UI.toggleModal('settings-modal', true)" title="Settings">⚙️</button>
       </div>
@@ -119,7 +131,7 @@
     </div>
 
     <main class="battlefield-wrapper">
-      <!-- OPPONENT BOARD (HIDDEN OUTSIDE COMBAT) -->
+      <!-- OPPONENT BOARD (HIDDEN OUTSIDE COMBAT / END PHASE) -->
       <section class="board-section opponent-board-section">
         <div class="board-header">
           <span id="opp-board-title">🤖 Bot Board</span>
@@ -193,17 +205,20 @@
         <div id="player-bench" class="bench-grid"></div>
       </div>
 
-      <!-- MARKET -->
-      <div class="market-container" id="market-container">
-        <div class="economy-bar">
-          <div class="gold-pill">
-            <span>🪙 <strong id="player-gold">6</strong></span>
-          </div>
-          <div class="econ-actions">
-            <button id="btn-buy-slot" class="btn-econ" onclick="UI.buySlot()">🔓 +1 Slot</button>
-            <button id="btn-reroll" class="btn-econ" onclick="UI.rerollMarket()">🎲 Reroll</button>
-          </div>
+      <!-- ECONOMY BAR (VISIBLE IN MARKET & PREPARATION SO UNDO / +1 SLOT ARE ACCESSIBLE) -->
+      <div class="economy-bar">
+        <div class="gold-pill">
+          <span>🪙 <strong id="player-gold">6</strong></span>
         </div>
+        <div class="econ-actions">
+          <button id="btn-undo" class="btn-econ" onclick="UI.undoAction()" title="Undo Last Action">↩️ Undo</button>
+          <button id="btn-buy-slot" class="btn-econ" onclick="UI.buySlot()">🔓 +1 Slot (3G)</button>
+          <button id="btn-reroll" class="btn-econ" onclick="UI.rerollMarket()">🎲 Reroll (2G)</button>
+        </div>
+      </div>
+
+      <!-- MARKET CARDS -->
+      <div class="market-container" id="market-container">
         <div id="market-cards" class="market-grid"></div>
       </div>
       
