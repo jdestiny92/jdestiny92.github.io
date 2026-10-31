@@ -1,0 +1,925 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Flip or Skip</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --felt: #1a4a2e; --gold: #c9a84c; --gold-light: #e8c76a;
+      --cream: #f5f0e8; --card-bg: #fafaf5; --red-card: #c0392b;
+    }
+    html, body {
+      min-height: 100%; font-family: 'DM Mono', monospace;
+      background: var(--felt);
+      background-image:
+        repeating-linear-gradient(0deg,transparent,transparent 39px,rgba(255,255,255,.03) 39px,rgba(255,255,255,.03) 40px),
+        repeating-linear-gradient(90deg,transparent,transparent 39px,rgba(255,255,255,.03) 39px,rgba(255,255,255,.03) 40px);
+    }
+    #game-root { max-width: 560px; margin: 0 auto; padding: 2rem 1.25rem 3rem; }
+
+    .game-title { font-family:'Playfair Display',serif; color:var(--gold); text-align:center; font-size:2.4rem; font-weight:900; letter-spacing:.05em; margin-bottom:.2rem; text-shadow:0 2px 8px rgba(0,0,0,.5); }
+    .game-subtitle { text-align:center; color:rgba(201,168,76,.6); font-size:.7rem; letter-spacing:.2em; text-transform:uppercase; margin-bottom:1.75rem; }
+
+    .screen { display:none; }
+    .screen.active { display:block; }
+
+    /* Lobby */
+    .lobby-card { background:rgba(0,0,0,.3); border:1px solid rgba(201,168,76,.2); border-radius:14px; padding:1.5rem; margin-bottom:1rem; }
+    .lobby-card-title { font-size:.62rem; text-transform:uppercase; letter-spacing:.15em; color:rgba(201,168,76,.55); margin-bottom:1rem; }
+    .lobby-input { width:100%; background:rgba(0,0,0,.35); border:1px solid rgba(201,168,76,.3); border-radius:8px; padding:.75rem 1rem; font-family:'DM Mono',monospace; font-size:1.1rem; color:var(--cream); letter-spacing:.2em; text-align:center; text-transform:uppercase; outline:none; margin-bottom:.75rem; }
+    .lobby-input:focus { border-color:var(--gold); }
+    .lobby-input::placeholder { color:rgba(245,240,232,.2); letter-spacing:.05em; text-transform:none; }
+    .name-input { letter-spacing:.05em; text-transform:none; font-size:.9rem; }
+    .code-display { font-family:'Playfair Display',serif; font-size:2.8rem; color:var(--gold-light); text-align:center; letter-spacing:.3em; margin:.5rem 0 .3rem; }
+    .code-hint { font-size:.68rem; color:rgba(245,240,232,.35); text-align:center; margin-bottom:1rem; }
+    .waiting-dots::after { content:''; animation:dots 1.4s infinite; }
+    @keyframes dots { 0%{content:''} 25%{content:'.'} 50%{content:'..'} 75%{content:'...'} }
+    .lobby-divider { border:none; border-top:1px solid rgba(201,168,76,.12); margin:1.25rem 0; }
+    .error-msg { font-size:.75rem; color:#ff6b6b; text-align:center; margin-top:.5rem; min-height:1.1rem; }
+    .mode-badge { display:inline-block; background:rgba(201,168,76,.12); border:1px solid rgba(201,168,76,.3); border-radius:20px; padding:.2rem .7rem; font-size:.62rem; color:var(--gold); letter-spacing:.1em; text-transform:uppercase; margin-bottom:1rem; }
+
+    /* Scoreboard */
+    .scoreboard { display:grid; grid-template-columns:1fr auto 1fr; gap:.75rem; margin-bottom:1.25rem; align-items:center; }
+    .score-panel { background:rgba(0,0,0,.35); border:1px solid rgba(201,168,76,.25); border-radius:12px; padding:.9rem 1rem; text-align:center; transition:border-color .2s,box-shadow .2s; }
+    .score-panel.active-turn { border-color:var(--gold); box-shadow:0 0 0 2px rgba(201,168,76,.2); }
+    .player-label { font-size:.62rem; letter-spacing:.15em; text-transform:uppercase; color:rgba(201,168,76,.7); margin-bottom:.3rem; }
+    .player-name-disp { font-family:'Playfair Display',serif; font-size:1rem; color:var(--gold-light); margin-bottom:.4rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .score-total { font-size:2.2rem; font-weight:500; color:var(--cream); line-height:1; }
+    .score-round { font-size:.68rem; color:rgba(245,240,232,.45); margin-top:.25rem; }
+    .round-badge { text-align:center; }
+    .round-label { font-size:.58rem; text-transform:uppercase; letter-spacing:.15em; color:rgba(201,168,76,.55); }
+    .round-num { font-family:'Playfair Display',serif; font-size:1.5rem; color:var(--gold); }
+    .deck-info { font-size:.62rem; color:rgba(201,168,76,.45); }
+
+    /* Hands */
+    .hand-area { background:rgba(0,0,0,.25); border:1px solid rgba(201,168,76,.15); border-radius:12px; padding:1rem 1.1rem; margin-bottom:.75rem; min-height:130px; }
+    .hand-title { font-size:.62rem; text-transform:uppercase; letter-spacing:.15em; color:rgba(201,168,76,.5); margin-bottom:.8rem; }
+    .cards-row { display:flex; flex-wrap:wrap; gap:.5rem; min-height:68px; align-items:center; }
+    .card { width:50px; height:70px; background:var(--card-bg); border-radius:7px; border:1px solid #d0ccc0; display:flex; align-items:center; justify-content:center; font-size:1.4rem; font-weight:500; color:#1a1a1a; box-shadow:1px 2px 5px rgba(0,0,0,.45); flex-shrink:0; }
+    .card.anim { animation:deal-in .25s ease-out; }
+    .card.red-card { color:var(--red-card); }
+    .card.bust-card { background:#fff0f0; border-color:#8b1a1a; color:#8b1a1a; }
+    @keyframes deal-in { from{transform:translateY(-16px) scale(.85);opacity:0} to{transform:translateY(0) scale(1);opacity:1} }
+    .card-back { width:50px; height:70px; background:#1a4a2e; border-radius:7px; border:2px solid rgba(201,168,76,.4); display:flex; align-items:center; justify-content:center; font-size:1.1rem; box-shadow:1px 2px 5px rgba(0,0,0,.45); flex-shrink:0; }
+    .empty-hand { color:rgba(245,240,232,.2); font-size:.75rem; }
+
+    /* Status */
+    .status-banner { background:rgba(0,0,0,.4); border:1px solid rgba(201,168,76,.18); border-radius:10px; padding:.85rem 1rem; text-align:center; margin-bottom:1rem; display:flex; align-items:center; justify-content:center; }
+    .status-banner.hidden { display:none; }
+    .status-text { color:var(--cream); font-size:.9rem; line-height:1.5; font-weight:500; }
+    .status-text.bust { color:#ff6b6b; }
+    .status-text.win { color:var(--gold-light); font-family:'Playfair Display',serif; font-size:1.1rem; }
+    .status-text.thinking { color:rgba(245,240,232,.45); font-style:italic; }
+
+    /* Buttons */
+    .action-buttons { display:grid; grid-template-columns:1fr 1fr; gap:.75rem; margin-bottom:.75rem; }
+    .btn { padding:.9rem; border-radius:10px; border:none; font-family:'DM Mono',monospace; font-size:.88rem; cursor:pointer; transition:background .15s,transform .1s,opacity .15s; letter-spacing:.04em; }
+    .btn:active { transform:scale(.97); }
+    .btn:disabled { opacity:.3; cursor:default; transform:none; }
+    .btn-flip { background:var(--gold); color:#1a1a1a; font-weight:500; }
+    .btn-flip:not(:disabled):hover { background:var(--gold-light); }
+    .btn-skip { background:transparent; color:var(--cream); border:1px solid rgba(245,240,232,.28); }
+    .btn-skip:not(:disabled):hover { background:rgba(255,255,255,.07); }
+    .btn-wide { width:100%; margin-bottom:.6rem; background:transparent; color:var(--gold); border:1px solid rgba(201,168,76,.35); font-weight:500; }
+    .btn-wide:hover { background:rgba(201,168,76,.09); }
+    .btn-wide.primary { background:var(--gold); color:#1a1a1a; border-color:var(--gold); }
+    .btn-wide.primary:hover { background:var(--gold-light); }
+
+    /* Tracker */
+    .tracker-section { background:rgba(0,0,0,.3); border:1px solid rgba(201,168,76,.15); border-radius:12px; padding:1rem; margin-top:.75rem; }
+    .tracker-title { font-size:.62rem; text-transform:uppercase; letter-spacing:.15em; color:rgba(201,168,76,.5); margin-bottom:.75rem; }
+    .tracker-grid { display:flex; flex-wrap:wrap; gap:.4rem; }
+    .tracker-chip { background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.12); border-radius:6px; padding:.28rem .5rem; font-size:.72rem; color:var(--cream); display:flex; align-items:center; gap:.3rem; transition:opacity .3s,background .15s,border-color .15s; position:relative; cursor:default; }
+    .tracker-chip:not(.exhausted):hover { background:rgba(201,168,76,.15); border-color:rgba(201,168,76,.45); }
+    .tracker-chip.exhausted { opacity:.28; text-decoration:line-through; }
+    .chip-count { font-size:.62rem; color:var(--gold); font-weight:500; }
+    .chip-tooltip { display:none; position:absolute; bottom:calc(100% + 7px); left:50%; transform:translateX(-50%); background:rgba(10,30,15,.97); border:1px solid rgba(201,168,76,.4); border-radius:7px; padding:.45rem .65rem; white-space:nowrap; z-index:50; pointer-events:none; }
+    .chip-tooltip::after { content:''; position:absolute; top:100%; left:50%; transform:translateX(-50%); border:5px solid transparent; border-top-color:rgba(201,168,76,.4); }
+    .tracker-chip:not(.exhausted):hover .chip-tooltip { display:block; }
+    .tracker-chip.tip-open .chip-tooltip { display:block; }
+    .tracker-chip.tip-open { background:rgba(201,168,76,.15); border-color:rgba(201,168,76,.45); }
+    .tooltip-prob { font-size:.82rem; color:var(--gold-light); font-weight:500; display:block; text-align:center; }
+    .tooltip-label { font-size:.62rem; color:rgba(245,240,232,.45); display:block; text-align:center; margin-top:.1rem; }
+    .tooltip-bar-bg { width:80px; height:4px; background:rgba(255,255,255,.1); border-radius:2px; margin:.35rem auto 0; overflow:hidden; }
+    .tooltip-bar-fill { height:100%; border-radius:2px; background:var(--gold); }
+
+    /* Coin */
+    .coin-overlay { position:fixed; inset:0; background:rgba(0,0,0,.82); display:flex; flex-direction:column; align-items:center; justify-content:center; z-index:200; }
+    .coin-overlay.hidden { display:none; }
+    .coin { width:90px; height:90px; border-radius:50%; background:conic-gradient(var(--gold-light) 0deg,var(--gold) 120deg,#a07c30 240deg,var(--gold-light) 360deg); display:flex; align-items:center; justify-content:center; font-size:2.2rem; box-shadow:0 4px 24px rgba(201,168,76,.4); margin-bottom:1.75rem; animation:coin-spin 1.3s cubic-bezier(.25,.46,.45,.94) forwards; }
+    @keyframes coin-spin { 0%{transform:rotateY(0deg) scale(.4);opacity:.4} 55%{transform:rotateY(900deg) scale(1.08);opacity:1} 100%{transform:rotateY(1080deg) scale(1)} }
+    .coin-result { font-family:'Playfair Display',serif; font-size:1.5rem; color:var(--gold-light); text-align:center; opacity:0; animation:fade-up .4s ease-out 1.1s forwards; }
+    .coin-sub { font-size:.78rem; color:rgba(245,240,232,.55); margin-top:.5rem; text-align:center; opacity:0; animation:fade-up .4s ease-out 1.3s forwards; }
+    .coin-btn { margin-top:1.75rem; padding:.7rem 2.2rem; background:var(--gold); color:#1a1a1a; border:none; border-radius:8px; font-family:'DM Mono',monospace; font-size:.88rem; font-weight:500; cursor:pointer; opacity:0; animation:fade-up .4s ease-out 1.6s forwards; transition:background .15s; }
+    .coin-btn:hover { background:var(--gold-light); }
+    @keyframes fade-up { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+
+    /* Rematch */
+    #btn-rematch { display:none; }
+    #btn-rematch.visible { display:block; }
+    .rematch-status { display:none; font-size:.72rem; color:rgba(201,168,76,.6); text-align:center; margin-top:.35rem; min-height:1rem; }
+    .rematch-status.visible { display:block; }
+  </style>
+</head>
+<body>
+<div id="game-root">
+  <div class="game-title">Flip or Skip</div>
+  <div class="game-subtitle">Press your luck · Card Game</div>
+
+  <!-- LOBBY -->
+  <div id="screen-lobby" class="screen active">
+    <div class="lobby-card">
+      <div class="lobby-card-title">Your name</div>
+      <input class="lobby-input name-input" id="player-name-input" type="text" maxlength="16" placeholder="Enter your name">
+    </div>
+    <div class="lobby-card">
+      <div class="lobby-card-title">Play online vs a friend</div>
+      <button class="btn btn-wide primary" id="btn-create-game">Create a Game</button>
+      <hr class="lobby-divider">
+      <input class="lobby-input" id="join-code-input" type="text" maxlength="6" placeholder="Enter game code">
+      <button class="btn btn-wide" id="btn-join-game">Join Game</button>
+      <div class="error-msg" id="join-error"></div>
+    </div>
+    <div class="lobby-card">
+      <div class="lobby-card-title">Play solo</div>
+      <button class="btn btn-wide" id="btn-vs-bot">Play vs Bot</button>
+    </div>
+  </div>
+
+  <!-- WAITING -->
+  <div id="screen-waiting" class="screen">
+    <div class="lobby-card" style="text-align:center;">
+      <div class="lobby-card-title">Share this code with your friend</div>
+      <div class="code-display" id="display-code">——</div>
+      <div class="code-hint">Waiting for opponent<span class="waiting-dots"></span></div>
+      <button class="btn btn-wide" id="btn-cancel-wait" style="margin-top:1rem;">Cancel</button>
+    </div>
+  </div>
+
+  <!-- GAME -->
+  <div id="screen-game" class="screen">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem;">
+      <div class="mode-badge" id="mode-badge">vs Bot</div>
+      <div style="font-size:.68rem;color:rgba(201,168,76,.45);" id="game-code-label"></div>
+    </div>
+    <div class="scoreboard">
+      <div class="score-panel" id="you-panel">
+        <div class="player-label">You</div>
+        <div class="player-name-disp" id="you-name-disp">Player</div>
+        <div class="score-total" id="you-total">0</div>
+        <div class="score-round" id="you-round">this round: 0</div>
+      </div>
+      <div class="round-badge">
+        <div class="round-label">Deck</div>
+        <div class="round-num" id="deck-count">78</div>
+        <div class="deck-info">cards left</div>
+      </div>
+      <div class="score-panel" id="opp-panel">
+        <div class="player-label" id="opp-label">Opponent</div>
+        <div class="player-name-disp" id="opp-name-disp">Dealer</div>
+        <div class="score-total" id="opp-total">0</div>
+        <div class="score-round" id="opp-round">this round: 0</div>
+      </div>
+    </div>
+    <div class="hand-area">
+      <div class="hand-title" id="hand-label">Current Hand</div>
+      <div class="cards-row" id="cards-display"><span class="empty-hand">no cards yet</span></div>
+    </div>
+    <div class="status-banner hidden" id="status-banner">
+      <div class="status-text" id="status-text"></div>
+    </div>
+    <div class="action-buttons">
+      <button class="btn btn-flip" id="btn-flip" disabled>FLIP</button>
+      <button class="btn btn-skip" id="btn-skip" disabled>SKIP</button>
+    </div>
+    <button class="btn btn-wide" id="btn-leave">Leave Game</button>
+    <button class="btn btn-wide primary" id="btn-rematch">Rematch</button>
+    <div class="rematch-status" id="rematch-status"></div>
+    <div class="tracker-section">
+      <div class="tracker-title">Cards Drawn This Game</div>
+      <div class="tracker-grid" id="tracker-grid"></div>
+    </div>
+  </div>
+</div>
+
+<div class="coin-overlay hidden" id="coin-overlay">
+  <div class="coin" id="coin-anim">🪙</div>
+  <div class="coin-result" id="coin-result-text"></div>
+  <div class="coin-sub" id="coin-sub-text"></div>
+  <button class="coin-btn" id="coin-dismiss">Let's Play</button>
+</div>
+
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import { getDatabase, ref, set, get, update, onValue, off, remove, serverTimestamp }
+  from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
+
+const firebaseConfig = {
+  apiKey: "AIzaSyAMMMf87RNwRig6jjbeRVpDA3fvGQ4fTW4",
+  authDomain: "fliporskip-c3924.firebaseapp.com",
+  databaseURL: "https://fliporskip-c3924-default-rtdb.firebaseio.com",
+  projectId: "fliporskip-c3924",
+  storageBucket: "fliporskip-c3924.firebasestorage.app",
+  messagingSenderId: "791080466164",
+  appId: "1:791080466164:web:085006c31509c6ef5190a1"
+};
+const fbApp = initializeApp(firebaseConfig);
+const db    = getDatabase(fbApp);
+
+// ── Deck ──────────────────────────────────────────────────────────────────────
+const FULL_DECK = [];
+for (let v = 1; v <= 12; v++) for (let i = 0; i < v; i++) FULL_DECK.push(v);
+
+function shuffle(arr) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function makeCode() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let c = '';
+  for (let i = 0; i < 6; i++) c += chars[Math.floor(Math.random() * chars.length)];
+  return c;
+}
+
+// ── Global state ──────────────────────────────────────────────────────────────
+let mode       = null;   // 'bot' | 'online'
+let myRole     = null;   // 'host' | 'guest' (online only)
+let myName     = 'Player';
+let oppName    = 'Dealer';
+let gameCode   = null;
+let gameRef    = null;
+let fbUnsub    = null;   // firebase listener unsubscribe
+let ls         = {};     // local state snapshot
+let coinPending   = null;  // callback after coin dismissed
+
+
+// ── DOM helpers ───────────────────────────────────────────────────────────────
+const $  = id => document.getElementById(id);
+const screens = { lobby: $('screen-lobby'), waiting: $('screen-waiting'), game: $('screen-game') };
+function showScreen(name) { Object.values(screens).forEach(s => s.classList.remove('active')); screens[name].classList.add('active'); }
+function enableBtns()  { $('btn-flip').disabled = false; $('btn-skip').disabled = false; }
+function disableBtns() { $('btn-flip').disabled = true;  $('btn-skip').disabled = true; }
+function setStatus(msg, cls) {
+  const el = $('status-text');
+  const banner = $('status-banner');
+  el.textContent = msg;
+  el.className = 'status-text' + (cls ? ' ' + cls : '');
+  // Only show the banner for important end-states; hide for routine game chatter
+  const important = cls === 'bust' || cls === 'win';
+  banner.classList.toggle('hidden', !important);
+}
+function handSum(h) { return (h || []).reduce((a, b) => a + b, 0); }
+function hasDupe(h) { return h.length !== new Set(h).size; }
+function uniqueCount(h) { return new Set(h).size || 1; }
+
+
+// ── Lobby events ──────────────────────────────────────────────────────────────
+$('btn-vs-bot').addEventListener('click', () => {
+  myName = $('player-name-input').value.trim() || 'Player';
+  startBotGame();
+});
+
+$('btn-create-game').addEventListener('click', async () => {
+  myName = $('player-name-input').value.trim() || 'Player';
+  $('join-error').textContent = '';
+  await createGame();
+});
+
+$('btn-join-game').addEventListener('click', async () => {
+  myName = $('player-name-input').value.trim() || 'Player';
+  const code = $('join-code-input').value.trim().toUpperCase();
+  if (code.length !== 6) { $('join-error').textContent = 'Please enter a 6-character code.'; return; }
+  $('join-error').textContent = '';
+  await joinGame(code);
+});
+
+$('btn-cancel-wait').addEventListener('click', () => {
+  if (gameRef) remove(gameRef);
+  stopFbListener();
+  gameRef = null; gameCode = null;
+  showScreen('lobby');
+});
+
+$('btn-leave').addEventListener('click', async () => {
+  const confirmed = window.confirm('Are you sure you want to leave? This will end the game for both players.');
+  if (!confirmed) return;
+  // Mark game as abandoned in Firebase so opponent sees it
+  if (mode === 'online' && gameRef) {
+    try { await update(gameRef, { gameOver: true, status: 'over', abandoned: true }); } catch(e) {}
+  }
+  leaveGame();
+  showScreen('lobby');
+});
+
+$('btn-rematch').addEventListener('click', async () => {
+  if (mode === 'bot') {
+    startBotGame();
+    return;
+  }
+  // Online: write my rematch vote, wait for both
+  const myVoteKey = myRole === 'host' ? 'rematchHost' : 'rematchGuest';
+  await update(gameRef, { [myVoteKey]: true });
+  $('btn-rematch').disabled = true;
+  $('rematch-status').textContent = 'Waiting for ' + oppName + '...';
+  $('rematch-status').classList.add('visible');
+});
+
+$('btn-flip').addEventListener('click', () => {
+  if (ls.gameOver) return;
+  disableBtns();
+  if (mode === 'bot') {
+    if (ls.currentTurn !== 'you') return;
+    botDraw('you');
+  } else {
+    if (ls.currentTurn !== myRole) return;
+    onlineDraw();
+  }
+});
+
+$('btn-skip').addEventListener('click', () => {
+  if (ls.gameOver) return;
+  disableBtns();
+  if (mode === 'bot') {
+    if (ls.currentTurn !== 'you') return;
+    const pts = handSum(ls.youHand);
+    setStatus('You stayed with ' + pts + ' pts. Dealer\'s turn.', '');
+    botFinishYou(false);
+  } else {
+    if (ls.currentTurn !== myRole) return;
+    const hand = myRole === 'host' ? ls.hostHand : ls.guestHand;
+    const pts = handSum(hand);
+    setStatus('You stayed with ' + pts + ' pts. Waiting for ' + oppName + '...', '');
+    onlineStay();
+  }
+});
+
+$('coin-dismiss').addEventListener('click', () => {
+  $('coin-overlay').classList.add('hidden');
+  if (coinPending) { const cb = coinPending; coinPending = null; cb(); }
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+//  BOT MODE
+// ══════════════════════════════════════════════════════════════════════════════
+function startBotGame() {
+  mode = 'bot'; myRole = null; oppName = 'Dealer';
+  stopFbListener();
+  ls = { deck: shuffle(FULL_DECK), youTotal: 0, botTotal: 0, youHand: [], botHand: [], drawn: {}, currentTurn: null, gameOver: false, botLock: false };
+  setupGameScreen();
+  showScreen('game');
+  resetBotUI();
+  const youFirst = Math.random() < 0.5;
+  ls.currentTurn = youFirst ? 'you' : 'bot';
+  showCoin(youFirst, () => botStartTurn());
+}
+
+function resetBotUI() {
+  renderHand($('cards-display'), [], null);
+  updateScoreUI(0, 0);
+  renderTracker(ls.deck.length, {});
+  $('deck-count').textContent = ls.deck.length;
+  $('you-round').textContent = 'this round: 0';
+  $('opp-round').textContent = 'this round: 0';
+  $('you-panel').classList.remove('active-turn');
+  $('opp-panel').classList.remove('active-turn');
+}
+
+function botStartTurn() {
+  if (ls.gameOver) return;
+  if (ls.deck.length === 0) { botEndGame(); return; }
+  ls.youHand = []; ls.botHand = []; ls.botLock = false;
+  renderHand($('cards-display'), [], null);
+  $('you-round').textContent = 'this round: 0';
+  $('opp-round').textContent = 'this round: 0';
+
+  if (ls.currentTurn === 'you') {
+    $('you-panel').classList.add('active-turn');
+    $('opp-panel').classList.remove('active-turn');
+    $('hand-label').textContent = 'Your Hand';
+    setStatus('Your turn — flip your first card!', '');
+    enableBtns();
+  } else {
+    $('opp-panel').classList.add('active-turn');
+    $('you-panel').classList.remove('active-turn');
+    $('hand-label').textContent = 'Dealer\'s Hand';
+    setStatus('Dealer\'s turn...', 'thinking');
+    setTimeout(() => botDraw('bot'), 850);
+  }
+}
+
+function botDraw(who) {
+  if (ls.deck.length === 0) { who === 'you' ? botFinishYou(false) : botFinishBot(false); return; }
+  const card = ls.deck.pop();
+  ls.drawn[card] = (ls.drawn[card] || 0) + 1;
+  renderTracker(ls.deck.length, ls.drawn);
+  $('deck-count').textContent = ls.deck.length;
+
+  const hand = who === 'you' ? ls.youHand : ls.botHand;
+  const busted = hand.includes(card);
+  hand.push(card);
+  const pts = handSum(hand);
+
+  if (who === 'you') {
+    renderHand($('cards-display'), hand, busted ? card : null);
+    $('you-round').textContent = busted ? 'BUST — +0' : 'this round: ' + pts;
+    if (busted) {
+      setStatus('Bust! You drew two ' + card + 's. Round lost.', 'bust');
+      setTimeout(() => botFinishYou(true), 1900);
+    } else {
+      setStatus((hand.length === 1 ? 'You drew a ' : 'Drew a ') + card + '. Total: ' + pts + '. Flip or stay?', '');
+      enableBtns();
+    }
+  } else {
+    // Show bot's hand in the shared hand area (values visible)
+    renderHand($('cards-display'), hand, busted ? card : null, false);
+    $('opp-round').textContent = busted ? 'BUST — +0' : 'this round: ' + pts;
+    if (busted) {
+      setStatus('Dealer drew two ' + card + 's — bust!', 'bust');
+      setTimeout(() => botFinishBot(true), 1900);
+    } else {
+      setStatus('Dealer drew a ' + card + '. Total: ' + pts + '...', 'thinking');
+      setTimeout(() => botAI(pts), 950);
+    }
+  }
+}
+
+function botAI(pts) {
+  if (ls.botLock) return;
+  if (ls.deck.length === 0) { botFinishBot(false); return; }
+  const df   = ls.deck.length / 78;
+  const n    = ls.botHand.length;
+  const risk = n / uniqueCount(ls.botHand);
+  const diff = ls.youTotal - ls.botTotal;
+  const left = ls.deck.reduce((a, b) => a + b, 0);
+  const desp = Math.max(0, Math.min(1, diff / (left + 1)));
+  const stop = (df > 0.5 ? 20 : 12) + Math.round(desp * 20);
+  const tol  = (df > 0.5 ? 1.5 : 1.15) + desp * 0.6;
+  const lim  = desp > 0.5 ? 7 : 5;
+  const draw = pts < stop && risk < tol && n < lim;
+  const mood = desp > 0.65 ? 'Dealer is gambling...' : desp > 0.3 ? 'Dealer draws another...' : 'Dealer draws carefully...';
+  if (draw) { setStatus(mood, 'thinking'); setTimeout(() => botDraw('bot'), 750); }
+  else { setStatus('Dealer stays with ' + pts + ' pts.', ''); setTimeout(() => botFinishBot(false), 1200); }
+}
+
+function botFinishYou(busted) {
+  disableBtns();
+  ls.youTotal += busted ? 0 : handSum(ls.youHand);
+  updateScoreUI(ls.youTotal, ls.botTotal);
+  $('you-panel').classList.remove('active-turn');
+  if (botMathCheck()) return;
+  ls.currentTurn = 'bot';
+  setTimeout(() => {
+    ls.botHand = []; ls.botLock = false;
+    renderHand($('cards-display'), [], null);
+    $('opp-round').textContent = 'this round: 0';
+    $('opp-panel').classList.add('active-turn');
+    $('you-panel').classList.remove('active-turn');
+    setStatus('Dealer\'s turn...', 'thinking');
+    setTimeout(() => botDraw('bot'), 850);
+  }, 1100);
+}
+
+function botFinishBot(busted) {
+  ls.botLock = true;
+  ls.botTotal += busted ? 0 : handSum(ls.botHand);
+  updateScoreUI(ls.youTotal, ls.botTotal);
+  $('opp-panel').classList.remove('active-turn');
+  if (ls.deck.length === 0) { setTimeout(botEndGame, 1100); return; }
+  if (botMathCheck()) return;
+  ls.currentTurn = 'you';
+  setTimeout(botStartTurn, 1200);
+}
+
+function botMathCheck() {
+  const left = ls.deck.reduce((a, b) => a + b, 0);
+  if (Math.abs(ls.youTotal - ls.botTotal) > left) { setTimeout(botEndGame, 600); return true; }
+  return false;
+}
+
+function botEndGame() {
+  ls.gameOver = true; disableBtns();
+  $('you-panel').classList.remove('active-turn');
+  $('opp-panel').classList.remove('active-turn');
+  const y = ls.youTotal, b = ls.botTotal;
+  const left = ls.deck.reduce((a, b2) => a + b2, 0);
+  const decided = ls.deck.length > 0 && Math.abs(y - b) > left;
+  let msg;
+  if (y > b) msg = decided ? 'You win! ' + y + ' vs ' + b + ' — gap can\'t be closed.' : 'You win! ' + y + ' vs ' + b + '. Well played!';
+  else if (b > y) msg = decided ? 'Dealer wins. ' + b + ' vs ' + y + ' — gap can\'t be closed.' : 'Dealer wins. ' + b + ' vs ' + y + '.';
+  else msg = "It's a tie! Both scored " + y + '.';
+  setStatus(msg, 'win');
+  showRematchBtn();
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+//  ONLINE: CREATE / JOIN
+// ══════════════════════════════════════════════════════════════════════════════
+async function createGame() {
+  gameCode = makeCode();
+  myRole   = 'host';
+  gameRef  = ref(db, 'games/' + gameCode);
+  await set(gameRef, {
+    hostName: myName, guestName: null, status: 'waiting',
+    deck: shuffle(FULL_DECK),
+    hostTotal: 0, guestTotal: 0, hostHand: [], guestHand: [],
+    drawn: {}, currentTurn: null, gameOver: false,
+    createdAt: serverTimestamp()
+  });
+  $('display-code').textContent = gameCode;
+  showScreen('waiting');
+  stopFbListener();
+  fbUnsub = onValue(gameRef, snap => {
+    if (!snap.exists()) { stopFbListener(); showScreen('lobby'); return; }
+    const g = snap.val();
+    if (g.status === 'active') {
+      stopFbListener();
+      oppName = g.guestName || 'Guest';
+      enterOnlineGame(g);
+    }
+  });
+}
+
+async function joinGame(code) {
+  const snap = await get(ref(db, 'games/' + code));
+  if (!snap.exists()) { $('join-error').textContent = 'Game not found. Check the code.'; return; }
+  const g = snap.val();
+  if (g.status !== 'waiting') { $('join-error').textContent = 'That game has already started.'; return; }
+  gameCode = code; myRole = 'guest';
+  gameRef  = ref(db, 'games/' + code);
+  oppName  = g.hostName || 'Host';
+  const hostFirst = Math.random() < 0.5;
+  await update(gameRef, { guestName: myName, status: 'active', currentTurn: hostFirst ? 'host' : 'guest' });
+  const snap2 = await get(gameRef);
+  enterOnlineGame(snap2.val());
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+//  ONLINE: GAME
+// ══════════════════════════════════════════════════════════════════════════════
+function enterOnlineGame(initG) {
+  mode = 'online';
+  ls   = gToLs(initG);
+  oppName = myRole === 'host' ? (initG.guestName || 'Guest') : (initG.hostName || 'Host');
+  setupGameScreen();
+  showScreen('game');
+  // Initial render
+  renderOnlineUI(initG, {});
+  // Subscribe
+  stopFbListener();
+  let prevG = initG;
+  fbUnsub = onValue(gameRef, snap => {
+    if (!snap.exists()) { leaveGame(); showScreen('lobby'); return; }
+    const g = snap.val();
+    renderOnlineUI(g, prevG);
+    ls = gToLs(g);
+    prevG = g;
+  });
+  // Coin flip — only the player whose turn it IS draws after dismissing.
+  const youFirst = initG.currentTurn === myRole;
+  showCoin(youFirst, () => {
+    // Nothing to do — player will click Flip a Card themselves
+  });
+}
+
+function gToLs(g) {
+  return {
+    deck: g.deck || [], hostTotal: g.hostTotal || 0, guestTotal: g.guestTotal || 0,
+    hostHand: g.hostHand || [], guestHand: g.guestHand || [],
+    drawn: g.drawn || {}, currentTurn: g.currentTurn, gameOver: !!g.gameOver, status: g.status
+  };
+}
+
+function myHand(state)  { return myRole === 'host' ? (state.hostHand  || []) : (state.guestHand || []); }
+function oppHandOf(state){ return myRole === 'host' ? (state.guestHand || []) : (state.hostHand  || []); }
+function myTot(state)   { return myRole === 'host' ? (state.hostTotal  || 0) : (state.guestTotal || 0); }
+function oppTot(state)  { return myRole === 'host' ? (state.guestTotal || 0) : (state.hostTotal  || 0); }
+
+function renderOnlineUI(g, prev) {
+  // Both players voted rematch → start a new game
+  if (g.rematchHost && g.rematchGuest) {
+    startOnlineRematch(g);
+    return;
+  }
+  // Opponent voted but I haven't yet
+  if (g.gameOver && !g.abandoned) {
+    const oppVoteKey = myRole === 'host' ? 'rematchGuest' : 'rematchHost';
+    const myVoteKey  = myRole === 'host' ? 'rematchHost'  : 'rematchGuest';
+    if (g[oppVoteKey] && !g[myVoteKey]) {
+      $('rematch-status').textContent = oppName + ' wants a rematch!';
+      $('rematch-status').classList.add('visible');
+    }
+  }
+  const state   = gToLs(g);
+  const prevState = prev && prev.deck ? gToLs(prev) : state;
+  const mh      = myHand(state);
+  const oh      = oppHandOf(state);
+  const prevMh  = myHand(prevState);
+  const prevOh  = oppHandOf(prevState);
+  const mNewCard  = mh.length > prevMh.length ? mh[mh.length - 1] : null;
+  const oNewCard  = oh.length > prevOh.length ? oh[oh.length - 1] : null;
+  const deckLen = (g.deck || []).length;
+
+  $('deck-count').textContent = deckLen;
+  updateScoreUI(myTot(state), oppTot(state));
+  renderTracker(deckLen, g.drawn || {});
+
+  // Show the active hand: mine when it's my turn, opponent's when it's theirs
+  const isMyTurnNow = g.currentTurn === myRole;
+  if (isMyTurnNow) {
+    $('hand-label').textContent = 'Your Hand';
+    renderHand($('cards-display'), mh, null, false, mNewCard);
+  } else {
+    $('hand-label').textContent = oppName + "'s Hand";
+    renderHand($('cards-display'), oh, null, false, oNewCard);
+  }
+
+  const myPts  = handSum(mh);
+  const oppPts = handSum(oh);
+  $('you-round').textContent = mh.length ? 'this round: ' + myPts : 'this round: 0';
+  $('opp-round').textContent = oh.length ? 'this round: ' + oppPts : 'this round: 0';
+
+  if (g.gameOver) {
+    disableBtns();
+    $('you-panel').classList.remove('active-turn');
+    $('opp-panel').classList.remove('active-turn');
+    const ms = myTot(state), os = oppTot(state);
+    let msg;
+    if (g.abandoned) {
+      // Give the DOM a moment to render, then alert + go home
+      setTimeout(() => {
+        alert(oppName + ' left the game. You win by default!');
+        leaveGame();
+        showScreen('lobby');
+      }, 150);
+      return;
+    } else if (ms > os) {
+      msg = 'You win! ' + ms + ' vs ' + os + '. Well played!';
+    } else if (os > ms) {
+      msg = oppName + ' wins. ' + os + ' vs ' + ms + '.';
+    } else {
+      msg = "It's a tie! Both scored " + ms + '.';
+    }
+    setStatus(msg, 'win');
+    showRematchBtn();
+    return;
+  }
+
+  const isMyTurn = g.currentTurn === myRole;
+  $('you-panel').classList.toggle('active-turn', isMyTurn);
+  $('opp-panel').classList.toggle('active-turn', !isMyTurn);
+
+  if (isMyTurn) {
+    if (mh.length === 0) {
+      setStatus('Your turn — flip your first card!', '');
+      enableBtns();
+    } else if (hasDupe(mh)) {
+      setStatus('Bust! You drew two ' + mh[mh.length - 1] + 's. Round lost.', 'bust');
+      disableBtns();
+    } else {
+      setStatus('Drew a ' + mh[mh.length - 1] + '. Total: ' + myPts + '. Flip or stay?', '');
+      enableBtns();
+    }
+  } else {
+    disableBtns();
+    if (oh.length === 0) setStatus('Waiting for ' + oppName + ' to play...', 'thinking');
+    else if (hasDupe(oh)) setStatus(oppName + ' busted! Their turn is ending...', 'thinking');
+    else setStatus(oppName + ' has ' + oppPts + ' pts — watching their move...', 'thinking');
+  }
+}
+
+async function onlineDraw() {
+  const snap = await get(gameRef);
+  if (!snap.exists()) return;
+  const g = snap.val();
+  if (g.gameOver || g.currentTurn !== myRole) return;
+
+  const deck = [...(g.deck || [])];
+  if (deck.length === 0) { await onlineEndMyTurn(true, g); return; }
+
+  const card = deck.pop();
+  const drawnMap = Object.assign({}, g.drawn || {});
+  drawnMap[card] = (drawnMap[card] || 0) + 1;
+  const handKey = myRole === 'host' ? 'hostHand' : 'guestHand';
+  const hand = [...(g[handKey] || [])];
+  const busted = hand.includes(card);
+  hand.push(card);
+  await update(gameRef, { deck, drawn: drawnMap, [handKey]: hand });
+
+  if (busted) {
+    setStatus('Bust! You drew two ' + card + 's. Round lost.', 'bust');
+    setTimeout(() => onlineEndMyTurn(true, null), 1900);
+  } else if (deck.length === 0) {
+    // Drew the last card in the deck — end turn immediately, no more choices
+    setStatus('Deck is empty! Ending your turn...', '');
+    setTimeout(() => onlineEndMyTurn(false, null), 1200);
+  }
+  // Otherwise: listener's renderOnlineUI enables buttons automatically
+}
+
+async function onlineStay() {
+  await onlineEndMyTurn(false, null);
+}
+
+async function onlineEndMyTurn(busted, gOverride) {
+  const snap = await get(gameRef);
+  if (!snap.exists()) return;
+  const g = gOverride || snap.val();
+  const handKey  = myRole === 'host' ? 'hostHand'  : 'guestHand';
+  const totalKey = myRole === 'host' ? 'hostTotal' : 'guestTotal';
+  const hand = g[handKey] || [];
+  const earned = busted ? 0 : handSum(hand);
+  const newTotal = (g[totalKey] || 0) + earned;
+
+  // Turn order: host goes → guest goes → reset hands → host goes → ...
+  const nextTurn = myRole === 'host' ? 'guest' : 'host';
+  const resetHands = myRole === 'guest'; // guest is always second; after guest, new round
+
+  const deck = g.deck || [];
+  const oppTotalVal = myRole === 'host' ? (g.guestTotal || 0) : (g.hostTotal || 0);
+  const deckPtsLeft = deck.reduce((a, b) => a + b, 0);
+  const gap = Math.abs(newTotal - oppTotalVal);
+  const mathWin = deck.length > 0 && gap > deckPtsLeft;
+
+  const updates = { [totalKey]: newTotal, currentTurn: nextTurn };
+  if (resetHands) { updates.hostHand = []; updates.guestHand = []; }
+  if (deck.length === 0 || mathWin) { updates.gameOver = true; updates.status = 'over'; }
+
+  await update(gameRef, updates);
+
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+//  REMATCH
+// ══════════════════════════════════════════════════════════════════════════════
+function showRematchBtn() {
+  const btn = $('btn-rematch');
+  btn.disabled = false;
+  btn.classList.add('visible');
+  $('rematch-status').classList.remove('visible');
+  $('rematch-status').textContent = '';
+}
+
+function hideRematchBtn() {
+  const btn = $('btn-rematch');
+  btn.disabled = false;
+  btn.classList.remove('visible');
+  $('rematch-status').classList.remove('visible');
+  $('rematch-status').textContent = '';
+}
+
+async function startOnlineRematch(g) {
+  // Only the host resets the game data to avoid double-write race
+  if (myRole === 'host') {
+    const hostFirst = Math.random() < 0.5;
+    await update(gameRef, {
+      deck: shuffle(FULL_DECK),
+      hostTotal: 0, guestTotal: 0,
+      hostHand: [], guestHand: [],
+      drawn: {},
+      currentTurn: hostFirst ? 'host' : 'guest',
+      gameOver: false, status: 'active', abandoned: false,
+      rematchHost: false, rematchGuest: false
+    });
+  }
+  // Both clients: reset local UI and re-enter game
+  hideRematchBtn();
+  setupGameScreen();
+  renderHand($('cards-display'), [], null);
+  updateScoreUI(0, 0);
+  renderTracker(78, {});
+  $('you-round').textContent = 'this round: 0';
+  $('opp-round').textContent = 'this round: 0';
+  $('you-panel').classList.remove('active-turn');
+  $('opp-panel').classList.remove('active-turn');
+  // Coin flip — listener will handle the rest once Firebase is updated
+  const youFirst = (myRole === 'host') ? g.currentTurn === 'host' : g.currentTurn === 'guest';
+  // Re-read after host write for accurate first-turn
+  const snap = await get(gameRef);
+  if (!snap.exists()) return;
+  const fresh = snap.val();
+  const youGoFirst = fresh.currentTurn === myRole;
+  showCoin(youGoFirst, () => {});
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+//  SHARED UI
+// ══════════════════════════════════════════════════════════════════════════════
+function setupGameScreen() {
+  $('mode-badge').textContent     = mode === 'bot' ? 'vs Bot' : 'vs ' + oppName;
+  $('game-code-label').textContent = gameCode ? 'Code: ' + gameCode : '';
+  $('you-name-disp').textContent  = myName;
+  $('opp-name-disp').textContent  = mode === 'bot' ? 'Dealer' : oppName;
+  $('opp-label').textContent      = mode === 'bot' ? 'Bot' : 'Opponent';
+  $('hand-label').textContent = 'Your Hand';
+  disableBtns();
+  hideRematchBtn();
+  updateScoreUI(0, 0);
+  renderTracker(78, {});
+  $('deck-count').textContent = 78;
+}
+
+function showCoin(youFirst, afterDismiss) {
+  const overlay = $('coin-overlay');
+  const coinEl  = $('coin-anim');
+  coinEl.style.animation = 'none'; void coinEl.offsetWidth;
+  coinEl.style.animation = 'coin-spin 1.3s cubic-bezier(.25,.46,.45,.94) forwards';
+  [$('coin-result-text'), $('coin-sub-text'), $('coin-dismiss')].forEach(el => {
+    el.style.animation = 'none'; void el.offsetWidth; el.style.animation = '';
+  });
+  $('coin-result-text').textContent = youFirst ? 'You go first!' : (mode === 'bot' ? 'Dealer goes first!' : oppName + ' goes first!');
+  $('coin-sub-text').textContent    = youFirst ? 'You won the coin flip — good luck!' : 'You lost the flip.';
+  coinPending = afterDismiss;
+  overlay.classList.remove('hidden');
+}
+
+function renderHand(el, hand, bustCard, showBack, newCard) {
+  el.innerHTML = '';
+  if (!hand || hand.length === 0) { el.innerHTML = '<span class="empty-hand">no cards yet</span>'; return; }
+  hand.forEach((v, idx) => {
+    const isNew = newCard !== undefined ? (v === newCard && idx === hand.length - 1) : false;
+    if (showBack) {
+      const c = document.createElement('div');
+      c.className = 'card-back' + (isNew ? ' anim' : '');
+      c.textContent = '🂠';
+      if (isNew) { c.style.animation = 'none'; void c.offsetWidth; c.style.animation = 'deal-in .25s ease-out'; }
+      el.appendChild(c);
+    } else {
+      const c = document.createElement('div');
+      c.className = 'card' + (v <= 6 ? ' red-card' : '') + (v === bustCard ? ' bust-card' : '') + (isNew ? ' anim' : '');
+      c.textContent = v;
+      if (isNew) { c.style.animation = 'none'; void c.offsetWidth; c.style.animation = 'deal-in .25s ease-out'; }
+      else c.style.animation = 'none';
+      el.appendChild(c);
+    }
+  });
+}
+
+function updateScoreUI(mine, theirs) {
+  $('you-total').textContent = mine;
+  $('opp-total').textContent = theirs;
+}
+
+function renderTracker(deckSize, drawn) {
+  const grid = $('tracker-grid');
+  grid.innerHTML = '';
+  for (let v = 1; v <= 12; v++) {
+    const d = (drawn && drawn[v]) ? Number(drawn[v]) : 0;
+    const rem = v - d;
+    const exh = rem <= 0;
+    const prob = deckSize > 0 ? (rem / deckSize) * 100 : 0;
+    const chip = document.createElement('div');
+    chip.className = 'tracker-chip' + (exh ? ' exhausted' : '');
+    const s1 = document.createElement('span'); s1.textContent = v;
+    const s2 = document.createElement('span'); s2.className = 'chip-count'; s2.textContent = d + '/' + v;
+    chip.appendChild(s1); chip.appendChild(s2);
+    if (!exh) {
+      const tt = document.createElement('div'); tt.className = 'chip-tooltip';
+      tt.innerHTML = '<span class="tooltip-prob">' + prob.toFixed(1) + '%</span><span class="tooltip-label">chance next card is ' + v + '</span><div class="tooltip-bar-bg"><div class="tooltip-bar-fill" style="width:' + Math.min(100, Math.round(prob)) + '%"></div></div>';
+      chip.appendChild(tt);
+      chip.addEventListener('click', function() {
+        document.querySelectorAll('.tracker-chip.tip-open').forEach(function(c) {
+          c.classList.remove('tip-open');
+          var otherTt = c.querySelector('.chip-tooltip');
+          if (otherTt) { otherTt.style.display = 'none'; clearTimeout(c._tipTimer); }
+        });
+        var tt = chip.querySelector('.chip-tooltip');
+        tt.style.display = 'block';
+        chip.classList.add('tip-open');
+        chip._tipTimer = setTimeout(function() {
+          tt.style.display = 'none';
+          chip.classList.remove('tip-open');
+        }, 2000);
+      });
+    }
+    grid.appendChild(chip);
+  }
+}
+
+function stopFbListener() {
+  if (fbUnsub && gameRef) { off(gameRef); fbUnsub = null; }
+}
+
+function leaveGame() {
+  stopFbListener();
+  if (mode === 'online' && gameRef) {
+    get(gameRef).then(s => { if (s.exists() && s.val().status !== 'over') remove(gameRef); }).catch(() => {});
+  }
+  gameRef = null; gameCode = null; mode = null; myRole = null; ls = {};
+}
+
+
+
+// Initial tracker
+renderTracker(78, {});
+</script>
+</body>
+</html>
