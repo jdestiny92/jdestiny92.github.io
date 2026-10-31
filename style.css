@@ -37,8 +37,11 @@ body {
 /* --- PHASE DISPLAY LOGIC --- */
 body.phase-market .opponent-board-section { display: none; }
 body.phase-market .player-board-section { display: none; }
-body.phase-prep .opponent-board-section { display: none; }
-body.phase-prep .market-container { display: none; }
+body.phase-market #action-console { flex: 1; justify-content: center; } /* Utilizes the empty top space */
+
+body.phase-preparation .opponent-board-section { display: none; }
+body.phase-preparation .market-container { display: none; } /* Properly hides market so button is visible */
+
 body.phase-combat .action-console { display: none; }
 /* --------------------------- */
 
@@ -63,32 +66,37 @@ body.phase-combat .action-console { display: none; }
 .board-header { display: flex; justify-content: space-between; font-size: 11px; font-weight: 700; color: var(--text-muted); margin-bottom: 2px; }
 .row-label { font-size: 8px; letter-spacing: 0.06em; color: #64748b; text-align: center; margin: 1px 0; font-weight: 700; }
 .board-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 3px; }
-.board-slot { height: 68px; background: var(--bg-slot); border: 1.5px dashed #334155; border-radius: 8px; position: relative; }
-.player-slot.slot-highlight { border-color: var(--accent-blue); background: rgba(56, 189, 248, 0.1); }
 
 .clash-divider { display: flex; justify-content: center; margin: 1px 0; }
 #combat-status-banner { background: linear-gradient(90deg, rgba(15,23,42,0), rgba(30,41,59,0.95), rgba(15,23,42,0)); font-size: 11px; font-weight: 600; padding: 3px 12px; width: 100%; text-align: center; color: #e2e8f0; }
 
-/* FIX: Unit Card Artwork Adjustments */
-.unit-card { width: 100%; height: 100%; background: var(--bg-card); border: 2px solid #475569; border-radius: 7px; display: flex; flex-direction: column; justify-content: space-between; padding: 2px; overflow: hidden; position: relative; cursor: pointer; }
+/* CLEAN UNIT CARD ARTWORK SIZING */
+.unit-card { width: 100%; height: 100%; border: 2px solid #475569; border-radius: 7px; position: relative; cursor: pointer; overflow: hidden; background: #000; }
 .unit-card.selected { border-color: #fff !important; box-shadow: 0 0 10px rgba(255,255,255,0.75); transform: translateY(-2px); z-index: 5; }
 .el-Fire { border-color: var(--el-fire); } .el-Water { border-color: var(--el-water); } .el-Earth { border-color: var(--el-earth); } .el-Air { border-color: var(--el-air); } .el-Light { border-color: var(--el-light); } .el-Shadow { border-color: var(--el-shadow); }
 
-.unit-art-wrap { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; opacity: 1; z-index: 1; }
-.unit-art-wrap img { width: 100%; height: 100%; object-fit: cover; border-radius: 4px; }
+.unit-art-wrap { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; z-index: 1; }
+.unit-art-wrap img { width: 100%; height: 100%; object-fit: cover; }
 
-.unit-top, .unit-bottom { display: flex; justify-content: space-between; align-items: center; z-index: 2; }
-.unit-top { font-size: 9px; font-weight: 800; background: rgba(0,0,0,0.6); padding: 1px 3px; border-radius: 4px; }
-.unit-stars { color: var(--accent-gold); letter-spacing: -1px; }
-.unit-name { font-size: 9px; font-weight: 800; text-align: center; z-index: 2; background: rgba(0,0,0,0.7); color: #fff; padding: 1px 0; border-radius: 3px; margin: auto 2px; }
-.unit-bottom { font-size: 9px; padding: 0 2px; background: rgba(0,0,0,0.6); border-radius: 4px; margin-bottom: 2px; }
-.stat-ap, .stat-hp { font-weight: 900; }
-.stat-ap { color: #fca5a5; }
-.stat-hp { color: #86efac; }
-.unit-role-warning { position: absolute; top: 12px; right: 2px; font-size: 8px; background: rgba(244, 63, 94, 0.9); padding: 0 2px; border-radius: 2px; z-index: 3; }
+.clean-card-bottom {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  background: rgba(0,0,0,0.75); padding: 3px 4px;
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 11px; font-weight: bold; color: #fff; z-index: 3;
+}
 
-.hp-bar-track { position: absolute; bottom: 0; left: 0; right: 0; height: 3px; background: rgba(0, 0, 0, 0.6); z-index: 3; }
-.hp-bar-fill { height: 100%; background: var(--accent-green); }
+.unit-role-warning { position: absolute; top: 4px; right: 4px; font-size: 12px; background: rgba(244, 63, 94, 0.9); padding: 2px; border-radius: 4px; z-index: 3; }
+
+.hp-bar-track { position: absolute; bottom: 0; left: 0; right: 0; height: 4px; background: rgba(0, 0, 0, 0.6); z-index: 4; }
+.hp-bar-fill { height: 100%; background: var(--accent-green); transition: width 0.2s; }
+.player-slot.slot-highlight { border-color: var(--accent-blue); background: rgba(56, 189, 248, 0.1); }
+
+/* DYNAMIC SLOT SIZING */
+.board-slot { height: 90px; background: var(--bg-slot); border: 1.5px dashed #334155; border-radius: 8px; position: relative; }
+body.phase-market .market-slot { height: 160px; border: 1px solid #334155; border-radius: 6px; position: relative; }
+body.phase-market .bench-slot { height: 110px; border: 1px solid #334155; border-radius: 6px; position: relative; background: rgba(15,23,42,0.75); }
+body.phase-preparation .bench-slot { height: 90px; border: 1px solid #334155; border-radius: 6px; position: relative; background: rgba(15,23,42,0.75); }
+body.phase-combat .board-slot { height: 80px; }
 
 /* Bottom Action Console & Bench Toggle */
 .action-console { background: var(--bg-panel); border-top: 1px solid var(--border-muted); padding: 6px 8px; display: flex; flex-direction: column; gap: 6px; }
@@ -102,14 +110,12 @@ body.phase-combat .action-console { display: none; }
 .bench-container.minimized .bench-grid { display: none; }
 .section-label { font-size: 9px; font-weight: 700; color: var(--text-muted); margin-bottom: 3px; cursor: pointer; background: rgba(15,23,42,0.8); padding: 4px; border-radius: 4px; text-align: center; }
 .bench-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; }
-.bench-slot, .market-slot { height: 60px; background: rgba(15,23,42,0.75); border: 1px solid #334155; border-radius: 6px; position: relative; }
 
 .economy-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
 .gold-pill { background: rgba(251,191,36,0.15); border: 1px solid var(--accent-gold); color: var(--accent-gold); padding: 4px 8px; border-radius: 6px; font-size: 12px; }
 .btn-econ { background: #1e293b; border: 1px solid #475569; color: #f8fafc; padding: 5px 8px; border-radius: 6px; font-size: 10px; cursor: pointer; }
 .btn-battle { background: linear-gradient(135deg, #22c55e, #16a34a); border: none; color: #fff; padding: 8px; border-radius: 6px; font-size: 12px; font-weight: 900; cursor: pointer; }
 .market-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; }
-.market-card-cost { font-size: 9px; color: var(--accent-gold); font-weight: 800; text-align: center; background: rgba(0, 0, 0, 0.7); position: absolute; bottom: 0; width: 100%; z-index: 3; }
 
 /* Modals */
 .modal-overlay { position: fixed; inset: 0; background: rgba(3,7,18,0.88); display: none; align-items: center; justify-content: center; z-index: 100; padding: 16px; }
@@ -120,4 +126,5 @@ body.phase-combat .action-console { display: none; }
 .btn { width: 100%; border: none; border-radius: 8px; padding: 10px; font-size: 14px; font-weight: 800; cursor: pointer; color: #fff; margin-bottom: 8px; }
 .btn-primary { background: linear-gradient(135deg, #0284c7, #0369a1); }
 .btn-accent { background: linear-gradient(135deg, #7c3aed, #6d28d9); }
+.btn-danger { background: #e11d48; }
 .btn-ghost { background: transparent; border: 1px solid #334155; }
