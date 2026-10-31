@@ -6,7 +6,7 @@
   <title>Auto-Battler: Mobile 1v1</title>
   <link rel="stylesheet" href="style.css" />
 </head>
-<body>
+<body class="phase-market">
   <!-- MAIN MENU OVERLAY -->
   <div id="main-menu" class="modal-overlay active">
     <div class="menu-card">
@@ -15,21 +15,12 @@
       <p class="subtitle">Tactical 1v1 Mobile Board Game</p>
 
       <div class="menu-section">
-        <h3>Play vs. Local Bot (Phases 1–3)</h3>
+        <h3>Play vs. Local Bot</h3>
         <button class="btn btn-primary" onclick="UI.startGame('easy')">
           <span>🤖 Play vs. Easy Bot</span>
-          <small>Casual AI • Random Buys • Row Aware</small>
         </button>
         <button class="btn btn-accent" onclick="UI.startGame('medium')">
           <span>🧠 Play vs. Medium Bot</span>
-          <small>Synergy AI • Fusions • Smart Economy</small>
-        </button>
-      </div>
-
-      <div class="menu-section disabled-section">
-        <h3>1v1 Online (Phase 4 Fast-Follow)</h3>
-        <button class="btn btn-outline" disabled>
-          <span>🌐 Create / Join Room (Coming Soon)</span>
         </button>
       </div>
 
@@ -49,11 +40,11 @@
         <ul class="rule-list">
           <li><strong>Melee (Warrior, Tank):</strong> Front Row. Back Row penalty: <code>-1 HP</code>.</li>
           <li><strong>Ranged (Archer, Mage, Healer):</strong> Back Row. Front Row penalty: <code>-1 AP</code>.</li>
-          <li><strong>Agile (Assassin):</strong> Either row freely with zero penalty.</li>
+          <li><strong>Agile (Assassin):</strong> Either row freely.</li>
         </ul>
         <h4>Fusion Rules</h4>
-        <p><strong>2x 1★</strong> same Class = <strong>1x 2★</strong>. <strong>3x 2★</strong> same Class = <strong>1x 3★</strong>. You pick which fused unit's Element to keep!</p>
-        <h4>Class Synergies (Unique Board/Active Units)</h4>
+        <p><strong>2x 1★</strong> = <strong>1x 2★</strong>. <strong>3x 2★</strong> = <strong>1x 3★</strong>. You pick the Element!</p>
+        <h4>Class Synergies</h4>
         <div id="ref-class-synergies" class="ref-grid"></div>
         <h4>Element Synergies</h4>
         <div id="ref-element-synergies" class="ref-grid"></div>
@@ -61,7 +52,7 @@
     </div>
   </div>
 
-  <!-- FUSION ELEMENT PICKER MODAL -->
+  <!-- FUSION MODAL -->
   <div id="fusion-modal" class="modal-overlay">
     <div class="modal-content small-modal">
       <div class="modal-header">
@@ -83,87 +74,95 @@
     </div>
   </div>
 
+  <!-- SETTINGS MODAL -->
+  <div id="settings-modal" class="modal-overlay">
+    <div class="modal-content small-modal">
+      <div class="modal-header">
+        <h2>Settings</h2>
+        <button class="btn-close" onclick="UI.toggleModal('settings-modal', false)">✕</button>
+      </div>
+      <div class="modal-body" style="text-align: center;">
+        <button class="btn btn-danger" onclick="UI.forfeitGame()">🏳️ Forfeit Match</button>
+        <button class="btn btn-ghost" onclick="UI.toggleModal('settings-modal', false)">Resume</button>
+      </div>
+    </div>
+  </div>
+
   <!-- MAIN GAME CONTAINER -->
   <div id="game-container">
-    <!-- TOP HUD BAR -->
     <header class="hud-bar">
       <div class="hud-left">
         <span class="round-pill">R<span id="hud-round">1</span></span>
         <span id="hud-phase" class="phase-pill">MARKET</span>
       </div>
       <div class="hud-center">
-        <div class="loss-tracker" title="Your Loss Tokens (6 = Elimination)">
+        <div class="loss-tracker">
           <span class="tracker-label">YOU</span>
           <div id="player-losses" class="skulls"></div>
         </div>
         <span class="vs-divider">VS</span>
-        <div class="loss-tracker" title="Opponent Loss Tokens (6 = Elimination)">
+        <div class="loss-tracker">
           <div id="bot-losses" class="skulls"></div>
           <span id="bot-label" class="tracker-label">BOT</span>
         </div>
       </div>
       <div class="hud-right">
+        <button class="icon-btn" onclick="UI.undoAction()" title="Undo Last Action">↩️</button>
         <button class="icon-btn" onclick="UI.toggleModal('rules-modal', true)" title="Synergy Sheet">📘</button>
-        <button class="icon-btn" onclick="UI.returnToMenu()" title="Menu">⚙️</button>
+        <button class="icon-btn" onclick="UI.toggleModal('settings-modal', true)" title="Settings">⚙️</button>
       </div>
     </header>
 
-    <!-- ACTIVE SYNERGY RIBBONS -->
     <div class="synergy-bar">
       <div id="player-synergies" class="synergy-pills"></div>
       <div id="bot-synergies" class="synergy-pills bot-pills"></div>
     </div>
 
-    <!-- BATTLEFIELD STACK (TOP = OPPONENT, MIDDLE = PLAYER) -->
     <main class="battlefield-wrapper">
-      <!-- ZONE 1: OPPONENT BOARD -->
+      <!-- OPPONENT BOARD (HIDDEN OUTSIDE COMBAT) -->
       <section class="board-section opponent-board-section">
         <div class="board-header">
-          <span id="opp-board-title">🤖 Bot Board (Slots: 1/6)</span>
+          <span id="opp-board-title">🤖 Bot Board</span>
           <span id="opp-gold-display" class="gold-text">🪙 6</span>
         </div>
-        <div class="row-label">BACK ROW (Ranged)</div>
+        <div class="row-label">BACK ROW</div>
         <div class="board-row" id="opp-back-row">
-          <div class="board-slot opp-slot" data-side="bot" data-row="back" data-col="0"></div>
-          <div class="board-slot opp-slot" data-side="bot" data-row="back" data-col="1"></div>
-          <div class="board-slot opp-slot" data-side="bot" data-row="back" data-col="2"></div>
+          <div class="board-slot opp-slot" data-col="0"></div><div class="board-slot opp-slot" data-col="1"></div><div class="board-slot opp-slot" data-col="2"></div>
         </div>
-        <div class="row-label">FRONT ROW (Melee)</div>
+        <div class="row-label">FRONT ROW</div>
         <div class="board-row" id="opp-front-row">
-          <div class="board-slot opp-slot" data-side="bot" data-row="front" data-col="0"></div>
-          <div class="board-slot opp-slot" data-side="bot" data-row="front" data-col="1"></div>
-          <div class="board-slot opp-slot" data-side="bot" data-row="front" data-col="2"></div>
+          <div class="board-slot opp-slot" data-col="0"></div><div class="board-slot opp-slot" data-col="1"></div><div class="board-slot opp-slot" data-col="2"></div>
         </div>
       </section>
 
-      <!-- CENTER CLASH DIVIDER / COMBAT BANNER -->
       <div class="clash-divider">
-        <div id="combat-status-banner">Select a unit on your Bench or Board to place/move</div>
+        <div id="combat-status-banner">Welcome to the Market Phase</div>
       </div>
 
-      <!-- ZONE 2: PLAYER BOARD -->
+      <!-- PLAYER BOARD -->
       <section class="board-section player-board-section">
-        <div class="row-label">FRONT ROW (Melee)</div>
+        <div class="row-label">FRONT ROW</div>
         <div class="board-row" id="player-front-row">
-          <div class="board-slot player-slot" data-row="front" data-col="0" onclick="UI.onBoardSlotClick('front', 0)"></div>
-          <div class="board-slot player-slot" data-row="front" data-col="1" onclick="UI.onBoardSlotClick('front', 1)"></div>
-          <div class="board-slot player-slot" data-row="front" data-col="2" onclick="UI.onBoardSlotClick('front', 2)"></div>
+          <div class="board-slot player-slot" data-col="0" onclick="UI.onBoardSlotClick('front', 0)"></div>
+          <div class="board-slot player-slot" data-col="1" onclick="UI.onBoardSlotClick('front', 1)"></div>
+          <div class="board-slot player-slot" data-col="2" onclick="UI.onBoardSlotClick('front', 2)"></div>
         </div>
-        <div class="row-label">BACK ROW (Ranged)</div>
+        <div class="row-label">BACK ROW</div>
         <div class="board-row" id="player-back-row">
-          <div class="board-slot player-slot" data-row="back" data-col="0" onclick="UI.onBoardSlotClick('back', 0)"></div>
-          <div class="board-slot player-slot" data-row="back" data-col="1" onclick="UI.onBoardSlotClick('back', 1)"></div>
-          <div class="board-slot player-slot" data-row="back" data-col="2" onclick="UI.onBoardSlotClick('back', 2)"></div>
+          <div class="board-slot player-slot" data-col="0" onclick="UI.onBoardSlotClick('back', 0)"></div>
+          <div class="board-slot player-slot" data-col="1" onclick="UI.onBoardSlotClick('back', 1)"></div>
+          <div class="board-slot player-slot" data-col="2" onclick="UI.onBoardSlotClick('back', 2)"></div>
         </div>
         <div class="board-header player-header">
-          <span id="player-board-title">🛡️ Your Board (1/1 Unlocked)</span>
+          <span id="player-board-title">🛡️ Your Board</span>
           <span id="deck-counter" class="deck-info">Deck: 43</span>
         </div>
       </section>
     </main>
 
-    <!-- COMBAT LOG DRAWER (VISIBLE IN COMBAT PHASE) -->
+    <!-- COMBAT CONSOLE (FEED COMMENTED OUT) -->
     <section id="combat-console" class="combat-console hidden">
+      <!-- 
       <div class="console-header">
         <span>⚔️ Live Battle Feed</span>
         <div class="speed-controls">
@@ -171,50 +170,47 @@
           <button id="speed-2x" class="btn-tiny" onclick="UI.setSpeed(2)">2x</button>
         </div>
       </div>
-      <div id="combat-log-list" class="combat-log-list"></div>
+      <div id="combat-log-list" class="combat-log-list"></div> 
+      -->
     </section>
 
-    <!-- ZONE 3: BOTTOM ACTION CONSOLE (MARKET & BENCH) -->
+    <!-- BOTTOM ACTION CONSOLE -->
     <footer id="action-console" class="action-console">
-      <!-- SELECTION / FUSION / SELL TOOLBAR -->
       <div id="unit-action-bar" class="unit-action-bar">
-        <div id="selected-unit-info" class="selected-info">Tap any unit to inspect or move</div>
+        <div id="selected-unit-info" class="selected-info">Select a unit</div>
         <div class="action-buttons">
-          <button id="btn-fuse" class="btn-small btn-fuse hidden" onclick="UI.triggerFusionPrompt()">✨ Fuse Upgrade</button>
-          <button id="btn-to-bench" class="btn-small btn-secondary hidden" onclick="UI.moveSelectedToBench()">⬇️ To Bench</button>
+          <button id="btn-fuse" class="btn-small btn-fuse hidden" onclick="UI.triggerFusionPrompt()">✨ Fuse</button>
+          <button id="btn-to-bench" class="btn-small btn-secondary hidden" onclick="UI.moveSelectedToBench()">⬇️ Bench</button>
           <button id="btn-sell" class="btn-small btn-danger hidden" onclick="UI.sellSelectedUnit()">💰 Sell</button>
         </div>
       </div>
 
-      <!-- BENCH (8 SLOTS) -->
-      <div class="bench-container">
-        <div class="section-label">
-          <span>BENCH (<span id="bench-count">0</span>/8)</span>
-          <span class="hint-text">Sell or Fuse from Bench/Board</span>
+      <!-- BENCH -->
+      <div class="bench-container minimized" id="bench-container">
+        <div class="section-label" onclick="UI.toggleBench()">
+          <span>BENCH (<span id="bench-count">0</span>/8) <small id="bench-toggle-text">[Show]</small></span>
         </div>
         <div id="player-bench" class="bench-grid"></div>
       </div>
 
-      <!-- MARKET SHOP (5 CARDS) + ECONOMY CONTROLS -->
-      <div class="market-container">
+      <!-- MARKET -->
+      <div class="market-container" id="market-container">
         <div class="economy-bar">
           <div class="gold-pill">
-            <span>🪙 <strong id="player-gold">6</strong> Gold</span>
+            <span>🪙 <strong id="player-gold">6</strong></span>
           </div>
           <div class="econ-actions">
-            <button id="btn-buy-slot" class="btn-econ" onclick="UI.buySlot()">
-              🔓 +1 Slot (<span id="slot-cost">3</span>G)
-            </button>
-            <button id="btn-reroll" class="btn-econ" onclick="UI.rerollMarket()">
-              🎲 Reroll (2G)
-            </button>
-            <button id="btn-battle" class="btn-battle" onclick="UI.startCombatPhase()">
-              ⚔️ BATTLE!
-            </button>
+            <button id="btn-buy-slot" class="btn-econ" onclick="UI.buySlot()">🔓 +1 Slot</button>
+            <button id="btn-reroll" class="btn-econ" onclick="UI.rerollMarket()">🎲 Reroll</button>
           </div>
         </div>
         <div id="market-cards" class="market-grid"></div>
       </div>
+      
+      <!-- PHASE ADVANCE BUTTON -->
+      <button id="btn-next-phase" class="btn-battle" onclick="UI.advancePhase()" style="width: 100%; margin-top: 6px;">
+        ➡️ Proceed to Preparation Phase
+      </button>
     </footer>
   </div>
 
